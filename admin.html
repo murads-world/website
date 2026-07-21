@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<title>Admin · Photo Wall</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  body{ background:#0F172A; color:#F1F5F9; font-family:Inter,sans-serif; }
+  ::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:#6D28D9;border-radius:8px}
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-md">
+
+  <!-- Экран входа по коду доступа -->
+  <div id="gate" class="bg-slate-800 border border-white/10 rounded-2xl p-6">
+    <h1 class="text-lg font-bold text-amber-400 mb-1">🔒 Photo Wall — Admin</h1>
+    <p class="text-sm text-slate-400 mb-4">Введи код доступа, чтобы загружать фото на доску Мурада.</p>
+    <input id="pass" type="password" placeholder="Код доступа" class="w-full px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 outline-none focus:border-emerald-400 text-sm mb-3"/>
+    <div id="gateMsg" class="text-xs text-red-400 min-h-[1.2rem] mb-2"></div>
+    <button onclick="checkPass()" class="w-full px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold hover:brightness-110 transition">Войти</button>
+  </div>
+
+  <!-- Панель загрузки (появляется после верного кода) -->
+  <div id="panel" class="bg-slate-800 border border-white/10 rounded-2xl p-6 hidden">
+    <h1 class="text-lg font-bold text-emerald-400 mb-4">📸 Добавить фото на доску</h1>
+    <div class="space-y-3">
+      <input type="file" id="phFile" accept="image/*" class="w-full text-sm bg-white/10 rounded-xl px-3 py-2 border border-white/15"/>
+      <input type="text" id="phCaption" maxlength="60" placeholder="Подпись (например: Матч с Lakers дома)" class="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/15 outline-none focus:border-emerald-400 text-sm placeholder:text-slate-400"/>
+      <div id="phUploadMsg" class="text-xs text-slate-400 min-h-[1.2rem]"></div>
+      <button onclick="phUpload()" id="phUploadBtn" class="w-full px-5 py-2.5 rounded-xl bg-emerald-500 text-slate-900 font-bold hover:brightness-110 transition">⬆️ Загрузить</button>
+    </div>
+    <hr class="border-white/10 my-5"/>
+    <div>
+      <div class="text-sm font-semibold text-slate-300 mb-2">Текущие фото на доске (<span id="phCount">0</span>)</div>
+      <div id="phList" class="space-y-2 max-h-64 overflow-y-auto"></div>
+    </div>
+    <a href="/" class="inline-block mt-5 text-xs text-slate-500 hover:text-slate-300">← Вернуться на основной сайт</a>
+  </div>
+
+</div>
+
+<script>
+/* ============ Настройка Supabase (то же хранилище, что у основного сайта) ============ */
+const SB_URL = 'https://kupqdpruksjvvzqwxckc.supabase.co';
+const SB_KEY = 'sb_publishable_324_aQsKoeWQxdac7H4t3Q_BYPuI92O';
+const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+/* ============ Простой код доступа (защита от случайных людей, не от целенаправленного взлома) ============ */
+const ACCESS_CODE = 'lakers9'; // поменяй на своё слово, если нужно
+const $ = s => document.querySelector(s);
+
+function checkPass(){
+  const val = ($('#pass').value || '').trim().toLowerCase();
+  if(val === ACCESS_CODE.toLowerCase()){
+    $('#gate').classList.add('hidden');
+    $('#panel').classList.remove('hidden');
+    sessionStorage.setItem('ph_admin_ok','1'); // не спрашивать код повторно в этой вкладке
+    phRefreshList();
+  } else {
+    $('#gateMsg').textContent = 'Неверный код доступа.';
+  }
+}
+$('#pass').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPass(); });
+if(sessionStorage.getItem('ph_admin_ok')==='1'){
+  $('#gate').classList.add('hidden'); $('#panel').classList.remove('hidden'); phRefreshList();
+}
+
+/* ============ Сжатие фото перед загрузкой ============ */
+function phCompress(file, maxSide=1280, quality=0.82){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+      const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Не удалось обработать изображение')), 'image/jpeg', quality);
+    }; img.onerror = () => reject(new Error('Не удалось прочитать изображение')); img.src = e.target.result; };
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============ Загрузка фото ============ */
+async function phUpload(){
+  const fileInput = $('#phFile'), captionInput = $('#phCaption'), msg = $('#phUploadMsg'), btn = $('#phUploadBtn');
+  const file = fileInput && fileInput.files[0];
+  if(!file){ msg.textContent = 'Выбери файл фото ✏️'; return; }
+  if(!file.type.startsWith('image/')){ msg.textContent = 'Нужен файл изображения (jpg, png...)'; return; }
+  btn.disabled = true; btn.textContent = 'Загружаем…'; msg.textContent = 'Сжимаем и отправляем в облако…';
+  try{
+    const blob = await phCompress(file);
+    const path = `murad-${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+    const { error: upErr } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' });
+    if(upErr) throw upErr;
+    const { data: pub } = sb.storage.from('photos').getPublicUrl(path);
+    const caption = (captionInput.value||'').trim().slice(0,60);
+    const { error: insErr } = await sb.from('photos').insert({ url: pub.publicUrl, caption });
+    if(insErr) throw insErr;
+    msg.textContent = '✅ Фото добавлено!';
+    fileInput.value=''; captionInput.value='';
+    phRefreshList();
+  }catch(err){
+    console.warn('phUpload error', err);
+    msg.textContent = '⚠️ Не получилось загрузить: ' + (err.message || 'проверь соединение');
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆️ Загрузить';
+  }
+}
+
+/* ============ Список текущих фото + удаление ============ */
+async function phRefreshList(){
+  const list = $('#phList'), count = $('#phCount');
+  const { data, error } = await sb.from('photos').select('*').order('created_at', { ascending:false });
+  if(error){ list.innerHTML = '<div class="text-xs text-red-400">Не удалось загрузить список</div>'; return; }
+  count.textContent = (data||[]).length;
+  if(!data || !data.length){ list.innerHTML = '<div class="text-xs text-slate-500">Пока пусто</div>'; return; }
+  list.innerHTML = data.map(p => `
+    <div class="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+      <img src="${p.url}" class="w-10 h-10 object-cover rounded"/>
+      <div class="flex-1 text-xs text-slate-300 truncate">${p.caption || '(без подписи)'}</div>
+      <button onclick="phDelete('${p.id}')" class="text-xs text-red-400 hover:text-red-300 px-2">Удалить</button>
+    </div>`).join('');
+}
+async function phDelete(id){
+  if(!confirm('Удалить это фото с доски?')) return;
+  const { error } = await sb.from('photos').delete().eq('id', id);
+  if(error){ alert('Не удалось удалить: ' + error.message); return; }
+  phRefreshList();
+}
+</script>
+</body>
+</html>
