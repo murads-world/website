@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MURAD'S WORLD — Город Исследователей</title>
+<meta name="description" content="MURAD'S WORLD — живой интерактивный мир и портфолио Мурада: LEGO, Minecraft, шахматы, AI, баскетбол Lakers и программирование."/>
+
+<!-- Шрифты: Inter (текст) + Pixelify Sans (игровые заголовки) -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Pixelify+Sans:wght@400;700&display=swap" rel="stylesheet"/>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Supabase (облачное хранилище фото) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+tailwind.config = {
+  theme: { extend: {
+    colors: { night:'#0F172A', night2:'#1E293B', grape:'#6D28D9', gold:'#F59E0B', neon:'#10B981' },
+    fontFamily: { pixel:['"Pixelify Sans"','cursive'], body:['Inter','sans-serif'] }
+  }}
+};
+</script>
+
+<style>
+/* ============ БАЗА ============ */
+* { -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+::-webkit-scrollbar{width:10px} ::-webkit-scrollbar-thumb{background:#6D28D9;border-radius:8px} ::-webkit-scrollbar-track{background:#0F172A}
+
+/* ============ НЕБО: ДЕНЬ/НОЧЬ ============ */
+#sky-day,#sky-night{ position:fixed; inset:0; z-index:-3; transition:opacity 1.5s; }
+#sky-day{ background:linear-gradient(#0EA5E9,#7DD3FC 45%,#FDE68A); opacity:0; }
+#sky-night{ background:linear-gradient(#020617,#0F172A 55%,#312E81); opacity:1; }
+body.day #sky-day{opacity:1} body.day #sky-night{opacity:0}
+#stars{ position:fixed; inset:0; z-index:-2; transition:opacity 1.5s; }
+body.day #stars{opacity:0}
+.star{ position:absolute; background:#fff; border-radius:9999px; animation:twinkle 3s infinite; }
+.cloud{ position:fixed; z-index:-1; background:rgba(255,255,255,.85); border-radius:9999px; filter:blur(2px); animation:drift linear infinite; }
+body.night .cloud{ opacity:.12 }
+#sunMoon{ position:fixed; top:5.2rem; right:1.6rem; z-index:-1; font-size:2.8rem; }
+
+/* ============ АНИМАЦИИ ============ */
+@keyframes twinkle{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes drift{from{transform:translateX(-25vw)}to{transform:translateX(115vw)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes bobble{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes sway{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
+@keyframes blinkEyes{0%,90%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes confettiFall{to{transform:translateY(110vh) rotate(720deg)}}
+@keyframes fogShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 10px rgba(245,158,11,.35)}50%{box-shadow:0 0 26px rgba(245,158,11,.85)}}
+
+.animate-floaty{animation:floaty 3s ease-in-out infinite}
+.animate-bobble{animation:bobble 2.2s ease-in-out infinite}
+.animate-pop{animation:pop .35s ease-out both}
+.animate-shake{animation:shake .4s}
+.animate-sway{animation:sway 4s ease-in-out infinite; transform-origin:bottom center}
+.blink{animation:blinkEyes 4s infinite}
+.confetti{position:fixed; top:-12px; z-index:99; animation:confettiFall linear forwards; pointer-events:none; border-radius:2px}
+
+/* Туман войны для закрытых зон */
+.fog{ background:linear-gradient(110deg,rgba(148,163,184,.5) 8%,rgba(51,65,85,.78) 18%,rgba(148,163,184,.5) 33%); background-size:200% 100%; animation:fogShift 6s ease-in-out infinite; backdrop-filter:blur(2px); }
+
+.pixel-shadow{ text-shadow:2px 2px 0 rgba(0,0,0,.45); }
+.card-hover{ transition:transform .25s, box-shadow .25s; }
+.card-hover:hover{ transform:translateY(-4px) scale(1.03); box-shadow:0 12px 32px rgba(109,40,217,.35); }
+.hud-btn{ padding:.375rem .55rem; border-radius:.5rem; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); transition:background .2s; }
+.hud-btn:hover{ background:rgba(255,255,255,.14); }
+
+/* Модалка */
+.modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,23,.72); backdrop-filter:blur(4px); z-index:60; display:flex; align-items:center; justify-content:center; padding:1rem; }
+.modal-card{ animation:pop .3s ease-out both; }
+
+/* Робот Pixel */
+#pixel-widget{ position:fixed; right:1rem; bottom:1rem; z-index:50; display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; }
+#pixel-bubble{ max-width:260px; }
+#pixel-bubble:empty{ display:none; }
+
+/* Листья дерева */
+.leaf{ position:absolute; transform:translate(-50%,-50%); transition:transform .2s; cursor:pointer; }
+.leaf:hover{ transform:translate(-50%,-50%) scale(1.35); }
+
+/* Ворота */
+.gate-door{ transition:transform 1.2s ease-in-out; }
+.gate-open-l{ transform:perspective(900px) rotateY(-105deg); }
+.gate-open-r{ transform:perspective(900px) rotateY(105deg); }
+
+/* Баскетбольный мяч */
+#ball{ position:absolute; left:50%; bottom:6%; transform:translateX(-50%); z-index:20; }
+</style>
+</head>
+
+<body class="night font-body bg-night text-slate-100 min-h-screen overflow-x-hidden">
+
+<!-- ======== НЕБО ======== -->
+<div id="sky-day"></div>
+<div id="sky-night"></div>
+<div id="stars" aria-hidden="true"></div>
+<div id="clouds" aria-hidden="true"></div>
+<div id="sunMoon" aria-hidden="true">🌙</div>
+
+<!-- ======== HUD ======== -->
+<header class="sticky top-0 z-40 bg-night/80 backdrop-blur border-b border-white/10">
+  <div class="max-w-6xl mx-auto px-3 py-2 flex items-center gap-2 flex-wrap">
+    <a href="#/map" class="font-pixel text-lg md:text-2xl bg-gradient-to-r from-gold via-neon to-grape bg-clip-text text-transparent" style="filter:drop-shadow(2px 2px 0 rgba(0,0,0,.45))">MURAD'S WORLD</a>
+    <div class="flex items-center gap-1.5 md:gap-2 ml-auto">
+      <span class="hidden sm:inline text-xs text-slate-400 mr-1" id="hudTime">🌙 Ночь</span>
+      <button id="skyBtn" onclick="cycleSky()" class="hud-btn" title="Время суток" aria-label="Переключить время суток">🌗</button>
+      <span class="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-sm" title="Ключи от Скрытых Врат">🗝️ <b id="hudKeys">0</b>/4</span>
+      <span class="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-sm" title="Собранные детали LEGO">🧩 <b id="hudParts">0</b></span>
+      <button id="sndBtn" onclick="toggleSound()" class="hud-btn" title="Звук" aria-label="Переключить звук">🔊</button>
+      <select id="navSelect" onchange="go(this.value)" class="bg-night2 border border-white/10 rounded-lg px-2 py-1.5 text-sm" aria-label="Выбор района"></select>
+    </div>
+  </div>
+</header>
+
+<!-- ======== КОНТЕНТ (страницы рендерятся сюда) ======== -->
+<main id="app" class="relative z-10"></main>
+
+<!-- ======== РОБОТ PIXEL ======== -->
+<div id="pixel-widget">
+  <div id="pixel-bubble" class="bg-white text-night text-sm font-semibold rounded-2xl rounded-br-sm px-4 py-3 shadow-xl" role="status" aria-live="polite"></div>
+  <button id="pixel-bot" onclick="Pixel.click()" aria-label="Робот Pixel — нажми меня" class="animate-floaty relative w-16 h-20">
+    <span class="absolute left-1/2 -translate-x-1/2 -top-1 w-0.5 h-3 bg-slate-400"></span>
+    <span class="absolute left-1/2 -translate-x-1/2 -top-3.5 w-2.5 h-2.5 rounded-full bg-neon" style="animation:glowPulse 2s infinite"></span>
+    <span class="absolute top-1 left-1/2 -translate-x-1/2 w-12 h-9 rounded-xl bg-gradient-to-b from-slate-200 to-slate-400 border-2 border-slate-500 flex items-center justify-center gap-1.5">
+      <span class="blink w-2 h-2.5 rounded-full bg-grape"></span>
+      <span class="blink w-2 h-2.5 rounded-full bg-grape" style="animation-delay:.12s"></span>
+    </span>
+    <span class="absolute top-11 left-1/2 -translate-x-1/2 w-14 h-8 rounded-lg bg-gradient-to-b from-grape to-indigo-800 border-2 border-indigo-900 flex items-center justify-center">
+      <span class="font-pixel text-[10px] text-neon">M-9</span>
+    </span>
+  </button>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+<div id="confettiRoot" aria-hidden="true"></div>
+
+<script>
+/* ================================================================
+   MURAD'S WORLD · Город Исследователей
+   Архитектура: STATE → SFX → UI-хелперы → PIXEL → НЕБО → HUD →
+   СТРАНИЦЫ (роутер) → МИНИ-ИГРЫ → ИНИЦИАЛИЗАЦИЯ
+================================================================ */
+
+/* ============ 1. ДАННЫЕ МИРА ============ */
+const ZONES = [
+  {id:'plaza',    name:'Central Plaza',   emoji:'🌳', sub:'Дерево Развития',   grad:'from-emerald-600 to-teal-700',    tag:"Сердце MURAD'S WORLD. Здесь растёт дерево, где каждый лист — достижение Мурада."},
+  {id:'home',     name:'Murad Home',      emoji:'🏠', sub:'Комната Мурада',    grad:'from-sky-600 to-blue-700',        tag:'Уютная комната, где всё кликабельно: книжная полка, шахматы, мяч Lakers.'},
+  {id:'lego',     name:'LEGO Workshop',   emoji:'🧱', sub:'Чертежи и сборки',  grad:'from-amber-500 to-orange-600',    tag:'Мастерская мастера Brick. Жизнь строится по кирпичику.'},
+  {id:'code',     name:'Code District',   emoji:'💻', sub:'IT-лаборатория',    grad:'from-blue-600 to-indigo-700',     tag:'Квартал программирования: проекты, робот и первые строки кода.'},
+  {id:'ai',       name:'AI District',     emoji:'🤖', sub:'Дом Пикселя',       grad:'from-violet-600 to-purple-800',   tag:'Футуристическая лаборатория: нейросети, генеративный арт, эксперименты.'},
+  {id:'sports',   name:'Sports Park',     emoji:'🏀', sub:'Арена Lakers',      grad:'from-purple-600 to-yellow-500',   tag:'Баскетбольная площадка в цветах Lakers. Забей три подряд!'},
+  {id:'minecraft',name:'Minecraft Valley',emoji:'⛏️', sub:'Воксельные постройки', grad:'from-green-600 to-emerald-800', tag:'Долина творчества: построй свой мир из блоков.'},
+  {id:'forest',   name:'Discovery Forest',emoji:'🌲', sub:'Лес увлечений',     grad:'from-teal-600 to-green-700',      tag:'Живой лес: новое увлечение — новое дерево.'},
+  {id:'photos',   name:'Photo Wall',      emoji:'📸', sub:'Доска памяти',      grad:'from-pink-500 to-rose-700',       tag:'Полароид-доска с настоящими моментами из жизни Мурада.'},
+  {id:'space',    name:'Space Port',      emoji:'🚀', sub:'Проектируется 🚧',  grad:'from-indigo-700 to-slate-800',    tag:'Космопорт мечты. Район проектируется, но мечты уже летают!'},
+  {id:'gate',     name:'Hidden Gate',     emoji:'🚪', sub:'Секрет',            grad:'from-slate-600 to-slate-800',     tag:'Загадочные ворота. Открываются четырьмя тайными ключами.'},
+];
+
+/* Листья Дерева Развития (x,y — % внутри контейнера дерева) */
+const LEAVES = [
+  {e:'💻', t:'Первая HTML-страница', d:'Мурад сам написал свою первую страницу &lt;html&gt; — с неё начался этот сайт!', x:20, y:20},
+  {e:'🚀', t:'LEGO «Тысячелетний сокол»', d:'Собрал корабль Хана Соло из 1300+ деталей. Терпение уровня джедая.', x:38, y:12},
+  {e:'♟️', t:'Победа в шахматах', d:'Выиграл решающую партию у папы — ферзём и ладьёй!', x:58, y:10},
+  {e:'📚', t:'10 книг за лето', d:'Прочитал десять книг за каникулы. Каждая книга — новый лист на дереве.', x:76, y:18},
+  {e:'⛏️', t:'Город в Minecraft', d:'Построил город с автофермами и редстоун-дверями.', x:14, y:42},
+  {e:'🤖', t:'Нейро-эксперименты', d:'Научился генерировать картинки с помощью нейросетей.', x:32, y:32},
+  {e:'🏀', t:'Дриблинг двумя руками', d:'Тренировал ведение каждый день — теперь мяч слушается обеих рук.', x:50, y:24},
+  {e:'🐍', t:'Первый скрипт Python', d:'Написал скрипт, который сам считает очки в игре.', x:68, y:36},
+  {e:'🧮', t:'Олимпиада по математике', d:'Занял призовое место на школьной олимпиаде.', x:44, y:46},
+  {e:'🎨', t:'Пиксель-арт', d:'Рисует спрайты для своей будущей игры.', x:82, y:44},
+];
+
+const RIDDLES = [
+  {k:'pixel', t:'Нажми на робота Pixel 7 раз — он что-то скрывает.'},
+  {k:'tree',  t:'На Дереве Развития в Central Plaza созрел золотой плод 🍎.'},
+  {k:'sport', t:'Забей 3 мяча подряд на арене в Sports Park.'},
+  {k:'chess', t:'Реши «мат в 1 ход» от совы Logic в комнате Мурада.'},
+];
+
+const TIPS = {
+  map:["Бип-буп! Я Pixel 🤖 Добро пожаловать в MURAD'S WORLD!","Нажимай на районы и исследуй мир!","Говорят, здесь спрятаны 4 ключа... Они открывают Скрытые Врата!"],
+  plaza:["Это Дерево Развития 🌳 Каждый лист — достижение Мурада!","Хм... золотое яблоко 🍎 выглядит подозрительно..."],
+  home:["Это комната Мурада. Здесь всё кликабельно!","Сова Logic оставила шахматную задачку у доски..."],
+  lego:["Мастер Brick обожает чертежи. Собери один — получишь детали!","Жизнь строится по кирпичику 🧱"],
+  code:["Напиши свою первую программу! Проведи робота к звезде ⭐","Каждый великий программист начинал с Hello, World!"],
+  ai:["Это мой дом! Сгенерируй нейро-питомца ⚡","Нейросети любят, когда их просят!"],
+  sports:["Lakers навсегда! 💜💛 Забей 3 подряд — там секрет!","Лови момент, когда кольцо прямо над мячом!"],
+  minecraft:["Построй свой мир из блоков!","Крипер-р-р... aw man 🎵"],
+  forest:["Добавь новое увлечение — и вырастет дерево!","Большой лес начинается с одного семечка 🌱"],
+  photos:["Настоящие фото настоящего Мурада! 📸","Прикрепи новый полароид на доску!"],
+  space:["Этот район проектируется 🚧 Но мечты уже летают!","Нажми «Запустить мечту» — это весело!"],
+  gate:["Врата открывают 4 ключа. Нашёл их все?","Я знаю, где один ключ... но не скажу 😏 (ну, если нажать на меня раз 7...)"],
+  general:["Исследуй каждый район!","Любопытство — это суперсила ⚡","Где-то спрятаны секреты... Смотри внимательнее!"]
+};
+
+const THOUGHTS = [
+  '«Если научить робота мечтать — он будет мечтать об электроовцах?»',
+  '«Нейросеть — как воображение: чем больше вопросов, тем лучше ответы!»',
+  '«01101000 01101001 — это "привет" на двоичном коде!»',
+  '«Ошибка 404: скука не найдена!»',
+  '«Даже самый умный AI начинается с Hello, World!»',
+  '«Шахматы — это тренажёрный зал для ума.»',
+  '«Лучший способ предсказать будущее — построить его.»'
+];
+
+/* ============ 1.5. SUPABASE (облачное хранилище фото) ============ */
+const SB_URL = 'https://kupqdpruksjvvzqwxckc.supabase.co';
+const SB_KEY = 'sb_publishable_324_aQsKoeWQxdac7H4t3Q_BYPuI92O';
+let sb = null;
+try{ sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null; }catch(e){ console.warn('Supabase init failed', e); }
+
+/* ============ 2. СОСТОЯНИЕ (localStorage) ============ */
+const LS = 'muradworld_v1';
+const SCHEMA_VERSION = 2;
+function def(){ return { version:SCHEMA_VERSION, keys:{pixel:false,tree:false,sport:false,chess:false}, parts:0, ach:{}, interests:['LEGO','Minecraft','Шахматы','AI','Баскетбол'], sound:true, sky:'auto', legoDone:0, mc:null, legoGallery:[] }; }
+let S = (()=>{
+  try{
+    const r=localStorage.getItem(LS);
+    if(r){
+      const parsed = JSON.parse(r);
+      const merged = Object.assign(def(), parsed);
+      // Миграция: если версия сохранённых данных старее текущей схемы,
+      // не теряем прогресс — просто дополняем недостающими полями (уже сделано через Object.assign).
+      merged.version = SCHEMA_VERSION;
+      return merged;
+    }
+  }catch(e){ console.warn('Не удалось прочитать сохранение, начинаем заново', e); }
+  return def();
+})();
+function save(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){ console.warn('Не удалось сохранить прогресс', e); toast('⚠️ Не получилось сохранить прогресс'); } }
+
+/* ============ 3. ХЕЛПЕРЫ ============ */
+const $ = s => document.querySelector(s);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const keyCount = () => Object.values(S.keys).filter(Boolean).length;
+const treeFor = n => ['🌳','🌲','🌴'][([...n].reduce((a,c)=>a+c.charCodeAt(0),0))%3];
+
+/* ============ 4. ЗВУК (Web Audio API) ============ */
+const SFX = {
+  ctx:null, on:true, amb:null,
+  ensure(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+            if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  tone(f,d=0.12,type='sine',v=0.12,w=0){
+    if(!this.on) return; this.ensure(); if(!this.ctx) return;
+    const t=this.ctx.currentTime+w, o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type; o.frequency.value=f;
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t+d+0.02);
+  },
+  click(){ this.tone(700,.05,'square',.04); },
+  pop(){ this.tone(340,.07,'sine',.08); },
+  success(){ this.tone(523,.12,'sine',.1); this.tone(659,.12,'sine',.1,.09); this.tone(784,.22,'sine',.1,.18); },
+  error(){ this.tone(160,.22,'sawtooth',.06); },
+  key(){ [880,1109,1319,1760].forEach((f,i)=>this.tone(f,.16,'triangle',.09,i*.08)); }
+};
+function ambientStart(){
+  if(SFX.amb || !S.sound) return; SFX.ensure(); if(!SFX.ctx) return;
+  const c=SFX.ctx, g=c.createGain(); g.gain.value=0.016; g.connect(c.destination);
+  const o1=c.createOscillator(), o2=c.createOscillator();
+  o1.frequency.value=96; o2.frequency.value=144.5;
+  o1.connect(g); o2.connect(g); o1.start(); o2.start();
+  SFX.amb={o1,o2,g};
+}
+function ambientStop(){ if(!SFX.amb) return; try{ SFX.amb.o1.stop(); SFX.amb.o2.stop(); SFX.amb.g.disconnect(); }catch(e){} SFX.amb=null; }
+document.addEventListener('pointerdown', ()=>{ if(S.sound) ambientStart(); });
+
+/* ============ 5. UI: тосты, конфетти, модалки ============ */
+function toast(msg){
+  const t=document.createElement('div');
+  t.className='fixed left-1/2 -translate-x-1/2 bottom-24 z-[70] bg-night2 border border-white/15 text-sm px-4 py-2.5 rounded-2xl shadow-2xl animate-pop max-w-[90vw] text-center';
+  t.textContent=msg; $('#toastRoot').appendChild(t);
+  setTimeout(()=>{ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(()=>t.remove(),420); },2600);
+}
+function confetti(n=80){
+  const colors=['#F59E0B','#6D28D9','#10B981','#38BDF8','#F472B6','#F8FAFC'];
+  const root=$('#confettiRoot');
+  for(let i=0;i<n;i++){
+    const s=document.createElement('span'); s.className='confetti';
+    const size=6+Math.random()*8;
+    s.style.cssText=`left:${Math.random()*100}vw;width:${size}px;height:${size*0.6}px;background:${pick(colors)};animation-duration:${2+Math.random()*2.5}s;animation-delay:${Math.random()*0.4}s;`;
+    root.appendChild(s); s.addEventListener('animationend',()=>s.remove());
+  }
+}
+function miniConfetti(xPct){
+  const colors=['#F59E0B','#6D28D9','#10B981'];
+  const root=$('#confettiRoot');
+  for(let i=0;i<14;i++){
+    const s=document.createElement('span'); s.className='confetti';
+    s.style.cssText=`left:${xPct+(Math.random()*10-5)}vw;top:22vh;width:7px;height:5px;background:${pick(colors)};animation-duration:${1.2+Math.random()}s;`;
+    root.appendChild(s); s.addEventListener('animationend',()=>s.remove());
+  }
+}
+function openModal(title, emoji, html){
+  $('#modalRoot').innerHTML = `
+  <div class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="modal-card bg-night2 border border-white/15 rounded-3xl max-w-md w-full p-6 relative shadow-2xl">
+      <button onclick="closeModal()" class="absolute top-3 right-4 text-slate-400 hover:text-white text-xl" aria-label="Закрыть">✕</button>
+      <div class="text-4xl">${emoji}</div>
+      <h3 class="font-pixel text-xl text-gold mt-2">${title}</h3>
+      <div class="text-sm text-slate-300 mt-3 leading-relaxed">${html}</div>
+    </div>
+  </div>`;
+  SFX.click();
+}
+function closeModal(){ $('#modalRoot').innerHTML=''; }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ============ 6. НАГРАДЫ ============ */
+function updateHUD(){
+  const k=$('#hudKeys'), p=$('#hudParts');
+  if(k) k.textContent=keyCount();
+  if(p) p.textContent=S.parts;
+  const sb=$('#sndBtn'); if(sb) sb.textContent=S.sound?'🔊':'🔇';
+}
+function award(id,label,parts=1){
+  if(S.ach[id]) return;
+  S.ach[id]=true; S.parts+=parts; save(); updateHUD();
+  SFX.success(); toast(`🏆 Достижение: ${label} · +${parts} 🧩`);
+}
+function awardKey(id,name){
+  if(S.keys[id]) return;
+  S.keys[id]=true; save(); updateHUD();
+  SFX.key(); confetti(120);
+  toast(`🗝️ Найден ключ: ${name}! (${keyCount()}/4)`);
+  if(keyCount()===4) setTimeout(()=>toast('🚪 Все ключи собраны! Иди к Скрытым Вратам!'),1800);
+}
+
+/* ============ 7. РОБОТ PIXEL ============ */
+function typewriter(el,text,speed=22){
+  if(el._tw) clearInterval(el._tw);
+  el.textContent=''; let i=0;
+  el._tw=setInterval(()=>{ el.textContent=text.slice(0,++i); if(i>=text.length) clearInterval(el._tw); },speed);
+}
+const Pixel = {
+  n:0,
+  say(t){ const b=$('#pixel-bubble'); if(b) typewriter(b,t); },
+  greet(page){ this.say(pick(TIPS[page] && TIPS[page].length ? TIPS[page] : TIPS.general)); },
+  click(){
+    this.n++; SFX.pop();
+    if(this.n===7 && !S.keys.pixel){ awardKey('pixel','Секрет Пикселя'); this.say('Бип-буп! Ты нашёл мой секретный ключ! 🗝️'); return; }
+    this.say(pick(TIPS.general));
+  }
+};
+
+/* ============ 8. НЕБО (день/ночь, звёзды, облака) ============ */
+function buildStars(){
+  let h='';
+  for(let i=0;i<70;i++){ const s=Math.random()*2+1;
+    h+=`<div class="star" style="left:${Math.random()*100}%;top:${Math.random()*70}%;width:${s}px;height:${s}px;animation-delay:${Math.random()*3}s"></div>`; }
+  $('#stars').innerHTML=h;
+}
+function buildClouds(){
+  let h='';
+  for(let i=0;i<4;i++){ const w=80+Math.random()*120;
+    h+=`<div class="cloud" style="top:${8+Math.random()*30}%;width:${w}px;height:${w*0.35}px;animation-duration:${60+Math.random()*60}s;animation-delay:-${Math.random()*60}s"></div>`; }
+  $('#clouds').innerHTML=h;
+}
+function updateSky(){
+  const h=new Date().getHours();
+  const day = S.sky==='day' || (S.sky==='auto' && h>=6 && h<20);
+  document.body.classList.toggle('day',day);
+  document.body.classList.toggle('night',!day);
+  const b=$('#skyBtn'); if(b) b.textContent = S.sky==='auto' ? '🌗' : day ? '☀️' : '🌙';
+  const t=$('#hudTime'); if(t) t.textContent = day ? '☀️ День' : '🌙 Ночь';
+  const sm=$('#sunMoon'); if(sm) sm.textContent = day ? '☀️' : '🌙';
+}
+function cycleSky(){ S.sky = S.sky==='auto'?'day' : S.sky==='day'?'night':'auto'; save(); updateSky(); SFX.click(); }
+function toggleSound(){
+  S.sound=!S.sound; save(); SFX.on=S.sound; updateHUD();
+  if(S.sound){ SFX.click(); ambientStart(); } else ambientStop();
+}
+
+/* ============ 9. РОУТЕР (многостраничность через hash) ============ */
+const app = document.getElementById('app');
+let cleanups=[];
+function onLeave(fn){ cleanups.push(fn); }
+function go(id){ if(location.hash==='#/'+id) route(); else location.hash='#/'+id; }
+
+const ROUTES = {}; // заполняется ниже
+
+function route(){
+  cleanups.forEach(f=>{ try{f()}catch(e){} }); cleanups=[];
+  closeModal();
+  const id = location.hash.replace('#/','') || 'map';
+  (ROUTES[id] || ROUTES.map)();
+  const sel=$('#navSelect'); if(sel) sel.value = ROUTES[id] ? id : 'map';
+  Pixel.greet(ROUTES[id] ? id : 'map');
+  window.scrollTo({top:0});
+}
+function initNav(){
+  $('#navSelect').innerHTML = '<option value="map">🗺️ Карта мира</option>' +
+    ZONES.map(z=>`<option value="${z.id}">${z.emoji} ${z.name}</option>`).join('');
+}
+
+/* Общий каркас страницы района */
+function pageShell(z, inner){
+  return `
+  <div class="max-w-6xl mx-auto px-4 pb-28 animate-pop">
+    <div class="pt-5"><button onclick="go('map')" class="text-sm px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition">🗺️ ← На карту</button></div>
+    <header class="text-center my-6">
+      <div class="text-5xl md:text-6xl inline-block animate-bobble">${z.emoji}</div>
+      <h1 class="font-pixel text-2xl md:text-4xl text-white pixel-shadow mt-2">${z.name}</h1>
+      <p class="text-slate-400 mt-2 text-sm md:text-base max-w-2xl mx-auto">${z.tag}</p>
+    </header>
+    ${inner}
+  </div>`;
+}
+function npcCard(e,name,text){
+  return `
+  <div class="flex gap-3 items-start bg-white/5 border border-white/10 rounded-2xl p-4">
+    <div class="text-4xl animate-bobble">${e}</div>
+    <div><div class="font-pixel text-gold">${name}</div><p class="text-sm text-slate-300 mt-1">${text}</p></div>
+  </div>`;
+}
+
+/* ============ 10. ГЛАВНАЯ: КАРТА МИРА ============ */
+ROUTES.map = function renderMap(){
+  const kc=keyCount();
+  const tiles = ZONES.map(z=>`
+    <button onclick="go('${z.id}')" class="card-hover relative text-left rounded-3xl p-4 md:p-5 bg-gradient-to-br ${z.grad} border border-white/15 overflow-hidden group min-h-[110px]">
+      <div class="text-4xl md:text-5xl group-hover:animate-bobble">${z.emoji}</div>
+      <div class="font-pixel text-sm md:text-base mt-2 text-white pixel-shadow">${z.name}</div>
+      <div class="text-[11px] md:text-xs text-white/75 mt-1">${z.sub}</div>
+      ${z.id==='gate' ? `<div class="absolute top-2 right-2 text-xs bg-black/40 rounded-full px-2 py-0.5">🗝️ ${kc}/4</div>` : ''}
+    </button>`).join('');
+  const future = [0,1].map(()=>`
+    <div class="relative rounded-3xl p-5 bg-night2 border border-dashed border-white/15 overflow-hidden min-h-[110px] flex items-center justify-center">
+      <span class="font-pixel text-white/40 text-sm">??? Район</span>
+      <div class="fog absolute inset-0 flex items-center justify-center"><span class="text-2xl">🚧</span></div>
+    </div>`).join('');
+  app.innerHTML = `
+  <div class="max-w-6xl mx-auto px-4 pb-28 animate-pop">
+    <section class="text-center pt-8 md:pt-12 pb-6">
+      <h1 class="font-pixel text-3xl md:text-6xl bg-gradient-to-r from-gold via-neon to-grape bg-clip-text text-transparent" style="filter:drop-shadow(3px 3px 0 rgba(0,0,0,.4))">MURAD'S WORLD</h1>
+      <p class="mt-3 text-slate-300 md:text-lg">Город Исследователей · живое интерактивное портфолио</p>
+      <p class="mt-1 text-sm text-slate-400">LEGO · Minecraft · шахматы · AI · баскетбол · программирование</p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3 text-sm">
+        <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10">🗝️ Ключи: <b>${kc}/4</b></span>
+        <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10">🧩 Детали: <b>${S.parts}</b></span>
+        <span class="px-3 py-1.5 rounded-full bg-white/5 border border-white/10">🏆 Достижения: <b>${Object.keys(S.ach).length}</b></span>
+      </div>
+    </section>
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" aria-label="Карта мира">
+      ${tiles}${future}
+    </section>
+    <p class="text-center text-xs text-slate-500 mt-6">🚧 ~30% мира ещё проектируется — город растёт вместе с Мурадом!</p>
+    <footer class="text-center text-xs text-slate-600 mt-10">Сделано с 💜 в MURAD WORLD · Город растёт каждый день</footer>
+  </div>`;
+};
+
+/* ============ 11. CENTRAL PLAZA — ДЕРЕВО РАЗВИТИЯ ============ */
+ROUTES.plaza = function renderPlaza(){
+  const leaves = LEAVES.map((l,i)=>`
+    <button class="leaf text-2xl md:text-3xl animate-bobble" style="left:${l.x}%;top:${l.y}%;animation-delay:${i*0.25}s" onclick="openLeaf(${i})" aria-label="${l.t}">${l.e}</button>`).join('');
+  app.innerHTML = pageShell(ZONES[0], `
+   <div class="grid md:grid-cols-2 gap-8 items-center">
+     <div class="relative mx-auto w-full max-w-md h-[420px] select-none" aria-label="Дерево Развития">
+       <div class="absolute left-1/2 -translate-x-1/2 top-2 w-[85%] h-64 rounded-[50%] bg-gradient-to-b from-emerald-500 to-green-700 shadow-2xl animate-sway"></div>
+       <div class="absolute left-1/2 -translate-x-1/2 bottom-0 w-10 h-44 bg-gradient-to-b from-amber-700 to-amber-900 rounded-xl"></div>
+       ${leaves}
+       <button class="leaf text-3xl rounded-full" style="left:87%;top:58%;animation:glowPulse 2s infinite" onclick="goldenFruit()" aria-label="Золотой плод">🍎</button>
+     </div>
+     <div>
+       ${npcCard('🧙‍♂️','Professor Byte','Каждое достижение — лист на этом дереве. Нажимай на них и узнавай историю Мурада!')}
+       <div class="mt-4 grid gap-2">
+         ${LEAVES.map((l,i)=>`<button onclick="openLeaf(${i})" class="text-left px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-sm">${l.e} ${l.t}</button>`).join('')}
+       </div>
+     </div>
+   </div>`);
+};
+function openLeaf(i){
+  const l=LEAVES[i]; SFX.pop();
+  openModal(l.t, l.e, `<p>${l.d}</p><p class="text-xs text-slate-500 mt-3">Лист #${i+1} на Дереве Развития</p>`);
+}
+function goldenFruit(){
+  if(S.keys.tree){ toast('Золотое яблоко уже отдало свой ключ 🙂'); return; }
+  awardKey('tree','Золотое яблоко');
+}
+
+/* ============ 12. MURAD HOME — КОМНАТА + ШАХМАТЫ ============ */
+function hs(e,label,fn){
+  return `<button onclick="${fn}" class="card-hover bg-gradient-to-b from-white/10 to-white/5 border border-white/10 rounded-2xl p-5 text-center"><div class="text-4xl">${e}</div><div class="text-sm mt-2 text-slate-300">${label}</div></button>`;
+}
+ROUTES.home = function renderHome(){
+  app.innerHTML = pageShell(ZONES[1], `
+   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+     ${hs('📚','Книжная полка','shelf()')}
+     ${hs('🏀','Мяч Lakers',"go('sports')")}
+     ${hs('🖥️','Рабочий стол',"go('code')")}
+     ${hs('🎒','Рюкзак','backpack()')}
+     ${hs('🛏️','Кровать','bed()')}
+     ${hs('🧸','Полка трофеев','trophies()')}
+   </div>
+   <div class="mt-10 grid md:grid-cols-2 gap-8 items-center">
+     <div>
+       ${npcCard('🦉','Сова Logic','Мат в 1 ход! Ход белых. Найди, куда должна пойти ферзь, чтобы чёрному королю некуда было деться.')}
+       <div id="chessMsg" class="text-sm text-slate-400 mt-3">Нажимай на клетку, куда должна пойти белая ферзь ♛.</div>
+       ${S.keys.chess ? '<div class="mt-3 font-pixel text-neon">✓ Задача решена!</div>' : ''}
+     </div>
+     <div id="chessBoard" class="mx-auto"></div>
+   </div>`);
+  buildChess();
+};
+function shelf(){ openModal('Книжная полка Мурада','📚','<ul class="space-y-2"><li>📕 «Гарри Поттер и философский камень» — Дж. К. Роулинг</li><li>📗 «Топор» — Гэри Полсен</li><li>📘 «Дэнни — чемпион мира» — Роальд Даль</li><li>📙 «Программирование для детей» — энциклопедия</li><li>📔 «Шахматы. Первые шаги»</li></ul><p class="text-xs text-slate-500 mt-3">+10 книг прочитано за это лето ✔️</p>'); }
+function backpack(){ openModal('Что в рюкзаке?','🎒','<ul class="space-y-2"><li>💻 Ноутбук для экспериментов</li><li>📓 Блокнот с идеями и чертежами</li><li>🧩 Карманный набор LEGO</li><li>🏀 Мяч Lakers (после школы)</li><li>🥪 Бутерброд. Очевидно 😄</li></ul>'); }
+function trophies(){ openModal('Полка трофеев','🏆','<ul class="space-y-2"><li>🥇 Школьный шахматный турнир — 2 место</li><li>🏀 MVP классного финала</li><li>🧱 LEGO-мастер — семейный конкурс</li><li>📜 Диплом олимпиады по математике</li></ul>'); }
+function bed(){ SFX.pop(); toast('Мурад заряжается 💤 До завтра!'); }
+
+/* --- Шахматная задача: ♚a8, ♔c6, ♕b5 → ♕b7# --- */
+function buildChess(){
+  const solved=S.keys.chess;
+  const pieces = solved ? {'a8':'k','c6':'K','b7':'Q'} : {'a8':'k','c6':'K','b5':'Q'};
+  const el=$('#chessBoard'); if(!el) return;
+  let h='<div class="grid grid-cols-8 w-[280px] h-[280px] md:w-80 md:h-80 rounded-lg overflow-hidden border-4 border-slate-600 shadow-2xl">';
+  for(let r=0;r<8;r++)for(let f=0;f<8;f++){
+    const sq='abcdefgh'[f]+(8-r);
+    const dark=(r+f)%2===1;
+    const p=pieces[sq];
+    const glyph = p ? (p==='Q'?'♛':'♚') : '';
+    const color = p && p===p.toUpperCase() ? 'color:#F8FAFC;text-shadow:0 0 3px #000,0 0 3px #000' : 'color:#0F172A';
+    h+=`<button data-sq="${sq}" class="flex items-center justify-center text-3xl md:text-4xl ${dark?'bg-[#B58863]':'bg-[#F0D9B5]'}" style="${color}" aria-label="Клетка ${sq}">${glyph}</button>`;
+  }
+  h+='</div>';
+  el.innerHTML=h;
+  el.querySelector('.grid').addEventListener('click', onChessClick);
+}
+function setChessMsg(t){ const m=$('#chessMsg'); if(m) m.textContent=t; }
+// Клетки, куда ферзь легально ходит с b5 (вертикаль b, горизонталь 5, диагонали) —
+// нужны, чтобы отличать "легальный, но не мат" ход от случайного клика мимо.
+function queenReaches(from, to){
+  const [ff,fr]=[from.charCodeAt(0), +from[1]], [tf,tr]=[to.charCodeAt(0), +to[1]];
+  if(from===to) return false;
+  const df=tf-ff, dr=tr-fr;
+  return df===0 || dr===0 || Math.abs(df)===Math.abs(dr);
+}
+function onChessClick(e){
+  const b=e.target.closest('[data-sq]'); if(!b) return;
+  const sq=b.dataset.sq;
+  if(S.keys.chess) return;
+  if(sq==='b7'){
+    SFX.success(); confetti(80);
+    setChessMsg('♛ b7 — шах и мат! Королю некуда бежать. Блестяще! 🎉');
+    awardKey('chess','Шах и мат');
+    award('chessWin','Решил задачу совы Logic',3);
+    buildChess();
+  } else if(sq==='b5'){
+    SFX.pop(); setChessMsg('Ферзь стоит на b5. Отправь её выше — прямо к королю!');
+  } else if(sq==='c6'){
+    SFX.pop(); setChessMsg('Король на c6 поддерживает ферзя — его трогать не нужно.');
+  } else if(queenReaches('b5', sq)){
+    // Ход геометрически возможен для ферзя, но не даёт мат — объясняем, почему конкретно
+    SFX.pop();
+    b.classList.add('animate-shake'); setTimeout(()=>b.classList.remove('animate-shake'),450);
+    setChessMsg(`Ферзь может пойти на ${sq}, но это не мат — у чёрного короля останется путь для отступления. Попробуй встать так, чтобы отрезать все клетки вокруг короля.`);
+  } else {
+    SFX.error();
+    b.classList.add('animate-shake'); setTimeout(()=>b.classList.remove('animate-shake'),450);
+    setChessMsg(pick(['Ферзь так ходить не может — только по прямой или диагонали.','Подсказка: решающий ход — по линии "b".','Король заперт в углу — нанеси финальный удар ферзём!']));
+  }
+}
+
+/* ============ 13. LEGO WORKSHOP — ЧЕРТЁЖ ============ */
+const LEGO_C={R:'#EF4444',Y:'#F59E0B',B:'#3B82F6',G:'#10B981',P:'#6D28D9',_:'rgba(255,255,255,.06)'};
+let legoCur='R', legoTarget=[], legoUser=[];
+function newLego(){ legoTarget=Array.from({length:12},()=>pick(['R','Y','B','G','P'])); legoUser=Array(12).fill('_'); }
+ROUTES.lego = function renderLego(){
+  if(!legoTarget.length) newLego();
+  app.innerHTML = pageShell(ZONES[2], `
+   ${npcCard('👷','Мастер Brick','Всё великое строится из маленьких кирпичиков. Собери мой чертёж — получишь детали!')}
+   <div class="mt-6 grid md:grid-cols-2 gap-8">
+     <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+       <div class="font-pixel text-gold mb-3 text-center">📋 Чертёж #<span id="legoNum">${S.legoDone+1}</span></div>
+       <div id="legoTarget" class="grid grid-cols-4 gap-1 w-fit mx-auto mb-2"></div>
+       <div class="text-xs text-slate-500 text-center mb-4">Целевой узор</div>
+       <div id="legoUser" class="grid grid-cols-4 gap-1.5 w-fit mx-auto my-4"></div>
+       <div class="flex flex-wrap justify-center gap-2" id="legoPalette"></div>
+       <div class="flex justify-center gap-3 mt-4">
+         <button onclick="legoCheck()" class="px-5 py-2 rounded-xl bg-neon text-night font-bold hover:brightness-110 transition">✓ Проверить</button>
+         <button onclick="legoClear()" class="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition">🧽 Очистить</button>
+       </div>
+     </div>
+     <div class="space-y-4">
+       <div class="bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-gold/30 rounded-2xl p-5">
+         <div class="font-pixel text-gold">🧱 Философия кирпичиков</div>
+         <p class="text-sm text-slate-300 mt-2">Дом не строится за один день: сначала фундамент, потом стены, потом крыша. Так и со знаниями: каждая прочитанная книга, каждый проект и каждая шахматная партия — кирпичик в фундамент будущего IT-инженера.</p>
+       </div>
+       <div class="bg-white/5 border border-white/10 rounded-2xl p-5 text-sm text-slate-300">
+         <div class="font-pixel text-neon mb-2">🏗️ Собрано чертежей: ${S.legoDone}</div>
+         Выбери цвет кирпича и раскрась клетки. Когда узор совпадёт с чертежом — жми «Проверить».
+       </div>
+       <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+         <div class="font-pixel text-gold mb-3">🏆 Коллекция построек</div>
+         ${legoGalleryHtml()}
+       </div>
+     </div>
+   </div>`);
+  legoDraw();
+};
+function legoDraw(){
+  const t=$('#legoTarget'), u=$('#legoUser'), p=$('#legoPalette');
+  if(!t) return;
+  t.innerHTML = legoTarget.map(c=>`<div class="w-6 h-6 rounded" style="background:${LEGO_C[c]}"></div>`).join('');
+  u.innerHTML = legoUser.map((c,i)=>`<button onclick="legoSet(${i})" class="w-12 h-12 md:w-14 md:h-14 rounded-lg border border-black/30 shadow-inner" style="background:${LEGO_C[c]}" aria-label="Кирпич ${i+1}"></button>`).join('');
+  p.innerHTML = Object.keys(LEGO_C).filter(k=>k!=='_').map(k=>`<button onclick="legoPick('${k}')" class="w-9 h-9 rounded-lg border-2 transition ${legoCur===k?'border-white scale-110':'border-transparent'}" style="background:${LEGO_C[k]}" aria-label="Цвет ${k}"></button>`).join('');
+}
+function legoPick(k){ legoCur=k; SFX.click(); legoDraw(); }
+function legoSet(i){ legoUser[i]=legoCur; SFX.pop(); legoDraw(); }
+function legoClear(){ legoUser=Array(12).fill('_'); SFX.click(); legoDraw(); }
+function legoCheck(){
+  const ok = legoUser.every((c,i)=>c===legoTarget[i]);
+  if(ok){
+    SFX.success(); confetti(90);
+    S.legoDone++; S.parts+=5;
+    if(!S.legoGallery) S.legoGallery=[];
+    S.legoGallery.unshift([...legoTarget]); // сохраняем собранный узор в коллекцию
+    S.legoGallery = S.legoGallery.slice(0,12); // держим последние 12, чтобы не раздувать хранилище
+    save(); updateHUD();
+    toast('🧱 Чертёж собран! +5 деталей');
+    if(S.legoDone===5) award('legoMaster5','Собрал 5 чертежей LEGO',5);
+    setTimeout(()=>{ newLego(); legoDraw(); const n=$('#legoNum'); if(n) n.textContent=S.legoDone+1; toast('📋 Сгенерирован новый чертёж!'); },700);
+  } else { SFX.error(); toast('Пока не совпадает! Сравни с чертежом 🤔'); }
+}
+function legoGalleryHtml(){
+  if(!S.legoGallery || !S.legoGallery.length) return '<p class="text-xs text-slate-500">Собери первый чертёж — он появится здесь!</p>';
+  return `<div class="flex flex-wrap gap-2">${S.legoGallery.map(pattern=>`
+    <div class="grid grid-cols-4 gap-[2px] p-1.5 bg-night rounded-lg border border-white/10">
+      ${pattern.map(c=>`<div class="w-2.5 h-2.5 rounded-[2px]" style="background:${LEGO_C[c]}"></div>`).join('')}
+    </div>`).join('')}</div>`;
+}
+
+/* ============ 14. CODE DISTRICT — РОБОТ-ПРОГРАММА ============ */
+const CG={cols:5,rows:5,start:[0,4],star:[4,0],walls:[[2,1],[2,2],[1,2]]};
+let cgPos=[...CG.start], cgProg=[], cgBusy=false;
+function building(e,name,status){
+  return `<div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-center card-hover"><div class="text-3xl">${e}</div><div class="font-pixel text-xs mt-2 text-white">${name}</div><div class="text-[11px] mt-1 ${status==='Построено'?'text-neon':'text-gold'}">${status}</div></div>`;
+}
+ROUTES.code = function renderCode(){
+  cgPos=[...CG.start]; cgProg=[]; cgBusy=false;
+  let cells='';
+  for(let r=0;r<CG.rows;r++)for(let c=0;c<CG.cols;c++){
+    const isWall=CG.walls.some(w=>w[0]===c&&w[1]===r);
+    const isStar=CG.star[0]===c&&CG.star[1]===r;
+    cells+=`<div class="w-12 h-12 md:w-14 md:h-14 rounded-md flex items-center justify-center text-2xl ${isWall?'bg-amber-900/70':isStar?'bg-grape/40 border border-grape':'bg-white/5'}">${isWall?'🧱':isStar?'⭐':''}</div>`;
+  }
+  app.innerHTML = pageShell(ZONES[3], `
+   <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+     ${building('🧮','Калькулятор','Построено')}
+     ${building('🌐','Первый сайт','Построено')}
+     ${building('🐍','Змейка на Python','Строится 🚧')}
+     ${building('🎮','Своя игра','Мечта ✨')}
+   </div>
+   <div class="grid md:grid-cols-2 gap-8 items-center">
+     <div>
+       ${npcCard('👾','Компилятор-3000','Напиши программу для робота: проведи его к звезде ⭐ в обход стен!')}
+       <div class="mt-4 flex flex-wrap gap-2">
+         ${['⬆️','⬇️','⬅️','➡️'].map((a,i)=>`<button onclick="cgPush(${i})" class="w-12 h-12 text-xl rounded-xl bg-white/10 border border-white/15 hover:bg-grape/40 active:scale-95 transition" aria-label="Шаг ${a}">${a}</button>`).join('')}
+         <button onclick="cgUndo()" class="px-4 h-12 rounded-xl bg-white/10 border border-white/15 hover:bg-white/20 transition">⌫</button>
+         <button onclick="cgRun()" class="px-5 h-12 rounded-xl bg-neon text-night font-bold hover:brightness-110 transition">▶ Запустить</button>
+         <button onclick="cgReset()" class="px-4 h-12 rounded-xl bg-white/10 border border-white/15 hover:bg-white/20 transition">↺</button>
+       </div>
+       <div id="cgProg" class="mt-4 min-h-[3rem] flex flex-wrap gap-1.5"></div>
+       <div id="cgMsg" class="text-sm text-slate-400 mt-2">Программа: нажимай стрелки, затем «Запустить».</div>
+     </div>
+     <div class="mx-auto">
+       <div class="relative inline-block bg-night2 p-2 rounded-2xl border border-white/10">
+         <div class="grid grid-cols-5 gap-1">${cells}</div>
+         <div class="absolute inset-2 pointer-events-none">
+           <div id="cgRobot" class="absolute w-1/5 h-1/5 flex items-center justify-center text-2xl md:text-3xl transition-transform duration-300" style="transform:translate(0%,400%)">🤖</div>
+         </div>
+       </div>
+     </div>
+   </div>`);
+  cgDraw();
+};
+function cgDraw(){
+  const rb=$('#cgRobot'); if(rb) rb.style.transform=`translate(${cgPos[0]*100}%, ${cgPos[1]*100}%)`;
+  const p=$('#cgProg'); if(p) p.innerHTML = cgProg.map(d=>`<span class="px-2.5 py-1 rounded-lg bg-grape/40 border border-grape text-sm">${['⬆️','⬇️','⬅️','➡️'][d]}</span>`).join('') || '<span class="text-xs text-slate-500">пусто</span>';
+}
+function cgPush(d){ if(cgBusy) return; if(cgProg.length>=20){ toast('Лимит программы — 20 шагов ✋'); return; } cgProg.push(d); SFX.click(); cgDraw(); }
+function cgUndo(){ cgProg.pop(); cgDraw(); }
+function cgReset(){ cgPos=[...CG.start]; cgProg=[]; cgBusy=false; cgDraw(); const m=$('#cgMsg'); if(m) m.textContent='Программа очищена.'; }
+async function cgRun(){
+  if(cgBusy || !cgProg.length) return; cgBusy=true;
+  const runToken = Symbol('cgRun'); // уникальная метка этого запуска
+  cgRun._token = runToken;
+  onLeave(()=>{ cgBusy=false; }); // страховка: если ушли со страницы, busy точно сбросится
+  const D=[[0,-1],[0,1],[-1,0],[1,0]];
+  for(const d of cgProg){
+    await sleep(320);
+    if(!$('#cgRobot') || cgRun._token!==runToken){ cgBusy=false; return; } // вышли со страницы или запустили заново
+    const nx=cgPos[0]+D[d][0], ny=cgPos[1]+D[d][1];
+    if(nx<0||ny<0||nx>=CG.cols||ny>=CG.rows||CG.walls.some(w=>w[0]===nx&&w[1]===ny)){
+      SFX.error(); const m=$('#cgMsg'); if(m) m.textContent='💥 Робот врезался в стену! Попробуй другой маршрут.';
+      cgPos=[...CG.start]; cgDraw(); cgBusy=false; return;
+    }
+    cgPos=[nx,ny]; cgDraw();
+    if(nx===CG.star[0]&&ny===CG.star[1]){
+      SFX.success(); confetti(70);
+      const m=$('#cgMsg'); if(m) m.textContent='🎉 Программа сработала! Робот достиг звезды!';
+      award('codeStar','Робот дошёл до звезды',3);
+      cgBusy=false; return;
+    }
+  }
+  const m=$('#cgMsg'); if(m) m.textContent='🤔 Робот остановился, но до звезды не дошёл. Добавь шагов!';
+  cgBusy=false;
+}
+
+/* ============ 15. AI DISTRICT — НЕЙРО-ПИТОМЕЦ ============ */
+ROUTES.ai = function renderAI(){
+  app.innerHTML = pageShell(ZONES[4], `
+   <div class="grid md:grid-cols-2 gap-8 items-start">
+     <div class="space-y-4">
+       ${npcCard('✨','Искра Spark','Здесь мечты встречают алгоритмы! Нажми кнопку — нейросеть нарисует тебе питомца.')}
+       <div class="bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+         <div class="font-pixel text-grape mb-3">🧠 Генератор нейро-питомцев</div>
+         <canvas id="aiCanvas" width="140" height="140" class="mx-auto rounded-xl border-2 border-grape/50 bg-night"></canvas>
+         <div id="aiName" class="font-pixel text-gold mt-3 h-6"></div>
+         <button onclick="aiGen()" class="mt-3 px-6 py-2.5 rounded-xl bg-gradient-to-r from-grape to-fuchsia-600 font-bold hover:brightness-110 active:scale-95 transition">⚡ Создать существо</button>
+       </div>
+     </div>
+     <div class="space-y-4">
+       <div class="bg-white/5 border border-white/10 rounded-2xl p-5">
+         <div class="font-pixel text-neon mb-2">💭 Мысли нейросети</div>
+         <p id="aiThought" class="text-sm text-slate-300 min-h-[3.5rem]">«Если научить робота мечтать — он будет мечтать об электроовцах?»</p>
+         <button onclick="aiThink()" class="mt-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-sm transition">🎲 Ещё мысль</button>
+       </div>
+       <div class="bg-gradient-to-br from-grape/20 to-indigo-800/20 border border-grape/30 rounded-2xl p-5 text-sm text-slate-300">
+         <div class="font-pixel text-white mb-2">🔬 Эксперименты Мурада</div>
+         <ul class="space-y-1.5 list-disc pl-5">
+           <li>Генеративный пиксель-арт (этот генератор!)</li>
+           <li>Чат-бот «Помощник по домашке» — в планах 🚧</li>
+           <li>Нейросеть для распознавания LEGO-деталей — мечта ✨</li>
+         </ul>
+       </div>
+     </div>
+   </div>`);
+  aiGen();
+};
+function aiGen(){
+  const cv=$('#aiCanvas'); if(!cv) return;
+  const ctx=cv.getContext('2d'), cell=14;
+  ctx.fillStyle='#0F172A'; ctx.fillRect(0,0,140,140);
+  const cols=['#6D28D9','#F59E0B','#10B981','#38BDF8','#F472B6'];
+  const c1=pick(cols), c2=pick(cols);
+  for(let y=0;y<10;y++)for(let x=0;x<5;x++){
+    if(Math.random()<0.5){
+      ctx.fillStyle=(x+y)%3?c1:c2;
+      ctx.fillRect(x*cell,y*cell,cell-1,cell-1);
+      ctx.fillRect((9-x)*cell,y*cell,cell-1,cell-1);
+    }
+  }
+  const n=$('#aiName');
+  if(n) n.textContent = pick(['Зи','Не','Ро','Пи','Квант','Бит']) + pick(['кс','трон','бот','люкс','-7']) + ' ' + pick(['Добрый','Быстрый','Любопытный','Мечтатель']);
+  SFX.pop();
+  award('aiPet','Первый нейро-питомец',2);
+}
+function aiThink(){ const t=$('#aiThought'); if(t){ typewriter(t,pick(THOUGHTS)); SFX.pop(); } }
+
+/* ============ 16. SPORTS PARK — БАСКЕТБОЛ LAKERS ============ */
+let spTimer=null, spHoopX=50, spDir=1, spFlying=false, spScore=0, spStreak=0;
+ROUTES.sports = function renderSports(){
+  spScore=0; spStreak=0; spFlying=false; spHoopX=50; spDir=1;
+  app.innerHTML = pageShell(ZONES[5], `
+   <div class="bg-gradient-to-b from-grape/30 to-night rounded-3xl border border-white/10 p-4 md:p-6">
+     <div class="flex justify-between items-center mb-3 font-pixel flex-wrap gap-2">
+       <span class="text-gold">🏀 Арена Lakers</span>
+       <span class="text-white text-sm">Очки: <b id="spScore">0</b> · Серия: <b id="spStreak">0</b>🔥</span>
+     </div>
+     <div id="court" class="relative h-72 md:h-80 rounded-2xl overflow-hidden bg-gradient-to-b from-indigo-900/60 to-amber-900/40 border border-white/10 select-none">
+       <div id="hoop" class="absolute top-6 -translate-x-1/2 z-10" style="left:50%">
+         <div class="w-20 h-12 bg-white/90 rounded-md mx-auto border-2 border-slate-300"></div>
+         <div class="w-14 h-2 bg-orange-500 rounded-full mx-auto -mt-1 shadow-lg"></div>
+         <div class="w-10 h-6 mx-auto border-2 border-t-0 border-white/60" style="clip-path:polygon(0 0,100% 0,80% 100%,20% 100%)"></div>
+       </div>
+       <div id="ball" class="text-4xl">🏀</div>
+       <div class="absolute bottom-0 inset-x-0 h-10 bg-amber-800/50"></div>
+     </div>
+     <div class="text-center mt-4">
+       <button onclick="spThrow()" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-gold to-orange-500 text-night font-pixel text-lg hover:brightness-110 active:scale-95 transition">Бросить! 🏀</button>
+       <p class="text-xs text-slate-400 mt-2">Жми, когда кольцо прямо над мячом. 3 подряд = секрет! 💜💛</p>
+     </div>
+   </div>`);
+  clearInterval(spTimer);
+  spTimer=setInterval(()=>{
+    spHoopX+=spDir*0.9;
+    if(spHoopX>86) spDir=-1; if(spHoopX<14) spDir=1;
+    const h=$('#hoop'); if(h) h.style.left=spHoopX+'%';
+  },30);
+  onLeave(()=>clearInterval(spTimer));
+};
+function spThrow(){
+  if(spFlying) return;
+  const ball=$('#ball'); if(!ball) return;
+  spFlying=true; SFX.pop();
+  const land=spHoopX;
+  const anim=ball.animate([
+    {left:'50%', bottom:'6%'},
+    {left:((50+land)/2)+'%', bottom:'80%', offset:.55},
+    {left:land+'%', bottom:'64%'}
+  ],{duration:650, easing:'ease-out'});
+  anim.onfinish=()=>{
+    const made = Math.abs(spHoopX-land) < 6.5;
+    if(made){
+      SFX.success(); spScore++; spStreak++; S.parts++; save(); updateHUD();
+      miniConfetti(land);
+      ball.animate([{bottom:'64%'},{bottom:'10%'}],{duration:300});
+      if(spStreak===3) awardKey('sport','Хет-трик');
+      else if(spStreak>3) toast('🔥 Серия x'+spStreak+'!');
+    } else {
+      SFX.error(); spStreak=0;
+      ball.animate([{left:land+'%', bottom:'64%'},{left:(land+14)+'%', bottom:'6%'}],{duration:500, easing:'ease-in'});
+    }
+    const sc=$('#spScore'), st=$('#spStreak');
+    if(sc) sc.textContent=spScore; if(st) st.textContent=spStreak;
+    setTimeout(()=>{ spFlying=false; },350);
+  };
+}
+
+/* ============ 17. MINECRAFT VALLEY — СТРОИТЕЛЬ ============ */
+const MC_BLOCKS=[
+  {id:'grass',c:'#22C55E',n:'Трава'},{id:'dirt',c:'#92610F',n:'Земля'},{id:'stone',c:'#94A3B8',n:'Камень'},
+  {id:'wood',c:'#B45309',n:'Дерево'},{id:'leaf',c:'#15803D',n:'Листва'},{id:'water',c:'#3B82F6',n:'Вода'},
+  {id:'lava',c:'#F97316',n:'Лава'},{id:'tnt',c:'#EF4444',n:'TNT'}
+];
+let mcSel='grass';
+ROUTES.minecraft = function renderMinecraft(){
+  const W=12,H=7;
+  if(!S.mc || S.mc.length!==W*H){
+    S.mc=Array.from({length:W*H},(_,i)=>{ const r=Math.floor(i/W); return r===H-1?'grass' : r===H-2 ? pick(['dirt','dirt','stone']) : ''; });
+    save();
+  }
+  app.innerHTML = pageShell(ZONES[6], `
+   <div class="bg-white/5 border border-white/10 rounded-3xl p-4 md:p-6">
+     <div class="flex flex-wrap gap-2 justify-center mb-4" id="mcPalette"></div>
+     <div id="mcGrid" class="grid gap-0.5 mx-auto w-fit bg-night2 p-2 rounded-xl border border-white/10" style="grid-template-columns:repeat(12,minmax(0,1fr))" oncontextmenu="return false"></div>
+     <p class="text-center text-xs text-slate-400 mt-3">Клик/тап — поставить блок. Правая кнопка (или долгое нажатие на телефоне) — убрать. «🧽 Ластик» тоже работает. Построй свой мир!</p>
+   </div>`);
+  mcDraw();
+};
+function mcDraw(){
+  const pal=$('#mcPalette'), g=$('#mcGrid'); if(!pal||!g) return;
+  pal.innerHTML = MC_BLOCKS.map(b=>`<button onclick="mcPick('${b.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition ${mcSel===b.id?'border-white scale-105':'border-transparent'}" style="background:${b.c}">${b.n}</button>`).join('')
+    + `<button onclick="mcPick('')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 border-2 ${mcSel===''?'border-white':'border-transparent'}">🧽 Ластик</button>`;
+  g.innerHTML = S.mc.map((b,i)=>`<button
+      onmousedown="mcPlace(${i},event)"
+      oncontextmenu="return false"
+      ontouchstart="mcTouchStart(${i},event)"
+      ontouchend="mcTouchEnd(${i},event)"
+      ontouchcancel="mcTouchEnd(${i},event)"
+      class="w-6 h-6 md:w-8 md:h-8 rounded-[3px]" style="background:${b?MC_BLOCKS.find(x=>x.id===b).c:'rgba(255,255,255,.04)'}" aria-label="Блок ${i+1}"></button>`).join('');
+}
+function mcPick(id){ mcSel=id; SFX.click(); mcDraw(); }
+function mcPlace(i,e){
+  // ПКМ на десктопе — стереть блок
+  if(e && e.button===2){ S.mc[i]=''; SFX.click(); } else { S.mc[i]=mcSel; SFX.pop(); }
+  save(); mcDraw();
+}
+// Тач-устройства: короткое касание — поставить блок, долгое нажатие (450мс+) — стереть
+let mcTouchTimer=null, mcTouchFired=false;
+function mcTouchStart(i,e){
+  e.preventDefault(); mcTouchFired=false;
+  mcTouchTimer=setTimeout(()=>{ mcTouchFired=true; S.mc[i]=''; SFX.click(); save(); mcDraw(); if(navigator.vibrate) navigator.vibrate(30); },450);
+}
+function mcTouchEnd(i,e){
+  e.preventDefault(); clearTimeout(mcTouchTimer);
+  if(!mcTouchFired){ S.mc[i]=mcSel; SFX.pop(); save(); mcDraw(); }
+}
+
+/* ============ 18. DISCOVERY FOREST — ЛЕС УВЛЕЧЕНИЙ ============ */
+ROUTES.forest = function renderForest(){
+  app.innerHTML = pageShell(ZONES[7], `
+   ${npcCard('🧚','Хранитель Леса','Каждое увлечение — это семечко. Посади новое — и вырастет дерево!')}
+   <div class="mt-6 bg-gradient-to-b from-teal-900/40 to-night rounded-3xl border border-white/10 p-6">
+     <div id="forestTrees" class="flex flex-wrap justify-center gap-4 min-h-[8rem] items-end"></div>
+     <div class="flex gap-2 max-w-md mx-auto mt-6">
+       <input id="forestInput" maxlength="20" placeholder="Новое увлечение (например, Робототехника)" class="flex-1 px-4 py-2.5 rounded-xl bg-white/10 border border-white/15 outline-none focus:border-neon text-sm"/>
+       <button onclick="forestAdd()" class="px-5 py-2.5 rounded-xl bg-neon text-night font-bold hover:brightness-110 transition">🌱 Посадить</button>
+     </div>
+   </div>`);
+  const inp=$('#forestInput');
+  if(inp) inp.addEventListener('keydown', e=>{ if(e.key==='Enter') forestAdd(); });
+  forestDraw();
+};
+function forestDraw(){
+  const t=$('#forestTrees'); if(!t) return;
+  t.innerHTML = S.interests.map((n,i)=>`
+    <div class="text-center animate-pop" style="animation-delay:${i*0.05}s">
+      <div class="text-4xl md:text-5xl animate-sway" style="animation-delay:${i*0.3}s">${treeFor(n)}</div>
+      <div class="text-[11px] text-slate-300 mt-1 max-w-[80px] truncate mx-auto" title="${esc(n)}">${esc(n)}</div>
+    </div>`).join('');
+}
+function forestAdd(){
+  const inp=$('#forestInput'); const v=(inp.value||'').trim();
+  if(!v){ toast('Введи название увлечения ✏️'); return; }
+  if(S.interests.some(n=>n.toLowerCase()===v.toLowerCase())){ toast('Такое дерево уже растёт 🙂'); return; }
+  S.interests.push(v); save(); SFX.success();
+  award('forestFirst','Посадил первое дерево',2);
+  forestDraw(); inp.value='';
+  toast(`🌱 «${v}» — выросло новое дерево!`);
+}
+
+/* ============ 18.5 PHOTO WALL — ПОЛАРОИД-ДОСКА ============ */
+let phCache = [];
+let phLoading = false;
+const PH_ROT = [-6,-3,-1,2,4,7,-4,3,-2,5,-7,1,6,-5,2];
+
+async function phFetch(){
+  if(!sb) return [];
+  const { data, error } = await sb.from('photos').select('*').order('created_at', { ascending:false });
+  if(error){ console.warn('phFetch error', error); return []; }
+  return data || [];
+}
+
+ROUTES.photos = function renderPhotos(){
+  const zone = ZONES.find(z=>z.id==='photos');
+  app.innerHTML = pageShell(zone, `
+   ${npcCard('🧸','Хранитель Памяти','Здесь живут настоящие моменты Мурада. Прикрепи новый полароид на доску!')}
+   <div class="mt-6 bg-gradient-to-b from-rose-950/40 to-night rounded-3xl border border-white/10 p-4 md:p-8">
+     <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
+       <button onclick="phOpenUpload()" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 font-pixel text-sm hover:brightness-110 active:scale-95 transition">📸 Добавить фото</button>
+       ${sb ? '' : '<span class="text-xs text-red-400">⚠️ Облако не настроено</span>'}
+     </div>
+     <div id="phBoard" class="relative min-h-[16rem] flex flex-wrap gap-6 justify-center items-start">
+       <div class="text-slate-400 text-sm py-10">Загружаем доску памяти…</div>
+     </div>
+   </div>`);
+  phLoad();
+};
+
+async function phLoad(){
+  if(phLoading) return; phLoading=true;
+  const board = $('#phBoard');
+  phCache = await phFetch();
+  if(!$('#phBoard')) { phLoading=false; return; } // ушли со страницы, пока грузилось
+  if(!phCache.length){
+    board.innerHTML = `<div class="text-center text-slate-400 text-sm py-10 w-full">Доска пока пустая — стань первым, кто прикрепит фото! 📌</div>`;
+  } else {
+    board.innerHTML = phCache.map((p,i)=>`
+      <div class="bg-white p-3 pb-8 rounded-sm shadow-2xl w-40 md:w-48 animate-pop card-hover cursor-pointer" style="transform:rotate(${PH_ROT[i%PH_ROT.length]}deg)" onclick="phZoom(${i})">
+        <div class="w-full aspect-square bg-slate-200 overflow-hidden rounded-sm">
+          <img src="${esc(p.url)}" alt="${esc(p.caption||'Фото Мурада')}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-3xl\\'>🖼️</div>'"/>
+        </div>
+        <div class="text-center text-night text-xs mt-2 font-semibold truncate px-1" style="font-family:'Pixelify Sans',cursive">${esc(p.caption || '')}</div>
+      </div>`).join('');
+  }
+  phLoading=false;
+}
+
+function phZoom(i){
+  const p = phCache[i]; if(!p) return; SFX.pop();
+  openModal(p.caption || 'Фото Мурада', '📸', `<img src="${esc(p.url)}" alt="${esc(p.caption||'')}" class="w-full rounded-xl border border-white/10"/>`);
+}
+
+function phOpenUpload(){
+  if(!sb){ toast('⚠️ Облачное хранилище не настроено'); return; }
+  openModal('Новый полароид', '📸', `
+    <div class="space-y-3">
+      <input type="file" id="phFile" accept="image/*" class="w-full text-sm bg-white/10 rounded-xl px-3 py-2 border border-white/15"/>
+      <input type="text" id="phCaption" maxlength="60" placeholder="Подпись (например: Матч с Lakers дома)" class="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/15 outline-none focus:border-neon text-sm text-white placeholder:text-slate-400"/>
+      <div id="phUploadMsg" class="text-xs text-slate-400 min-h-[1.2rem]"></div>
+      <button onclick="phUpload()" id="phUploadBtn" class="w-full px-5 py-2.5 rounded-xl bg-neon text-night font-bold hover:brightness-110 transition">⬆️ Загрузить</button>
+    </div>`);
+}
+
+// Сжимаем фото перед загрузкой, чтобы не расходовать зря место в облаке
+function phCompress(file, maxSide=1280, quality=0.82){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => { img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+      const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Не удалось обработать изображение')), 'image/jpeg', quality);
+    }; img.onerror = () => reject(new Error('Не удалось прочитать изображение')); img.src = e.target.result; };
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function phUpload(){
+  const fileInput = $('#phFile'), captionInput = $('#phCaption'), msg = $('#phUploadMsg'), btn = $('#phUploadBtn');
+  const file = fileInput && fileInput.files[0];
+  if(!file){ msg.textContent = 'Выбери файл фото ✏️'; return; }
+  if(!file.type.startsWith('image/')){ msg.textContent = 'Нужен файл изображения (jpg, png...)'; return; }
+  btn.disabled = true; btn.textContent = 'Загружаем…'; msg.textContent = 'Сжимаем и отправляем в облако…';
+  try{
+    const blob = await phCompress(file);
+    const path = `murad-${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+    const { error: upErr } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' });
+    if(upErr) throw upErr;
+    const { data: pub } = sb.storage.from('photos').getPublicUrl(path);
+    const caption = (captionInput.value||'').trim().slice(0,60);
+    const { error: insErr } = await sb.from('photos').insert({ url: pub.publicUrl, caption });
+    if(insErr) throw insErr;
+    SFX.success(); confetti(70);
+    award('firstPhoto','Прикрепил первый полароид',2);
+    closeModal();
+    toast('📸 Фото добавлено на доску!');
+    phLoad();
+  }catch(err){
+    console.warn('phUpload error', err);
+    SFX.error();
+    msg.textContent = '⚠️ Не получилось загрузить. Проверь интернет и попробуй снова.';
+    btn.disabled = false; btn.textContent = '⬆️ Загрузить';
+  }
+}
+
+/* ============ 19. SPACE PORT — СТРОЙКА МЕЧТЫ ============ */
+let launching=false;
+ROUTES.space = function renderSpace(){
+  app.innerHTML = pageShell(ZONES[8], `
+   <div class="relative overflow-hidden rounded-3xl border border-dashed border-white/20 bg-gradient-to-b from-indigo-950 to-night p-6 md:p-10">
+     <div class="fog absolute inset-0 opacity-40 pointer-events-none"></div>
+     <div class="relative grid md:grid-cols-2 gap-8 items-center">
+       <div>
+         <div class="font-pixel text-gold text-xl">🚧 Район проектируется</div>
+         <p class="text-slate-300 text-sm mt-2">Здесь пока стройка — как и у больших мечт Мурада. Но стартовая площадка уже готова!</p>
+         <div class="mt-5 space-y-2">
+           ${['Сделать свою видеоигру 🎮','Выучить Python и JavaScript 💻','Выиграть городской турнир по шахматам ♟️','Поступить в IT-университет 🎓','Запустить стартап 🚀'].map(m=>`
+             <div class="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm">
+               <span>🛰️</span><span class="flex-1">${m}</span><span class="text-[10px] font-pixel text-gold">0%</span>
+             </div>`).join('')}
+         </div>
+       </div>
+       <div class="text-center">
+         <div id="rocketCount" class="font-pixel text-5xl text-gold h-16"></div>
+         <div id="rocket" class="text-7xl md:text-8xl inline-block transition-all duration-700">🚀</div>
+         <div class="mt-4"><button onclick="launch()" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-grape to-indigo-600 font-pixel hover:brightness-110 active:scale-95 transition">Запустить мечту 🚀</button></div>
+       </div>
+     </div>
+   </div>`);
+};
+function launch(){
+  if(launching) return; launching=true; SFX.click();
+  const rc=$('#rocketCount'), r=$('#rocket');
+  let n=3; rc.textContent=n;
+  const iv=setInterval(()=>{
+    n--;
+    if(n>0){ rc.textContent=n; SFX.pop(); }
+    else{
+      clearInterval(iv); rc.textContent='GO!';
+      SFX.success(); confetti(100);
+      r.style.transform='translateY(-160px) rotate(-8deg) scale(1.3)'; r.style.opacity='0';
+      setTimeout(()=>{ rc.textContent=''; r.style.transform=''; r.style.opacity='1'; launching=false; toast('🌟 Мечта запущена! Она обязательно сбудется!'); },1600);
+    }
+  },700);
+}
+
+/* ============ 20. HIDDEN GATE — СКРЫТЫЕ ВРАТА ============ */
+ROUTES.gate = function renderGate(){
+  const kc=keyCount(); const open=kc>=4;
+  app.innerHTML = pageShell(ZONES[9], `
+   <div class="max-w-3xl mx-auto">
+     <div class="relative mx-auto w-72 h-80" style="perspective:900px">
+       <div class="absolute inset-0 rounded-2xl bg-black/60 border border-white/10 flex items-center justify-center">
+         ${open
+           ? '<div class="text-center animate-pop"><div class="text-7xl">🏆</div><div class="font-pixel text-gold mt-2">Строитель Мира</div></div>'
+           : '<div class="text-5xl opacity-40">🔒</div>'}
+       </div>
+       <div class="gate-door absolute left-0 top-0 w-1/2 h-full bg-gradient-to-r from-slate-700 to-slate-600 rounded-l-2xl border border-white/10 flex items-center justify-end pr-2 ${open?'gate-open-l':''}" style="transform-origin:left center"><span class="text-2xl opacity-50">◀</span></div>
+       <div class="gate-door absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-slate-700 to-slate-600 rounded-r-2xl border border-white/10 flex items-center justify-start pl-2 ${open?'gate-open-r':''}" style="transform-origin:right center"><span class="text-2xl opacity-50">▶</span></div>
+     </div>
+     <div class="mt-8 grid grid-cols-4 gap-3 max-w-sm mx-auto">
+       ${RIDDLES.map(r=>`<div class="aspect-square rounded-full border-2 flex items-center justify-center text-2xl ${S.keys[r.k]?'border-gold bg-gold/20':'border-white/15 bg-white/5'}">${S.keys[r.k]?'🗝️':'❔'}</div>`).join('')}
+     </div>
+     ${open ? `
+       <div class="mt-8 text-center bg-gradient-to-br from-gold/20 to-grape/20 border border-gold/40 rounded-3xl p-8 animate-pop">
+         <div class="font-pixel text-2xl text-gold">🎉 Врата открыты!</div>
+         <p class="text-slate-200 mt-3 text-sm md:text-base">Ты нашёл все 4 ключа и вошёл в тайную комнату. Вот главный секрет MURAD'S WORLD: <b>любой мир строится из любопытства, игры и маленьких шагов.</b> Впереди — ещё 70% неоткрытых районов!</p>
+         <button onclick="megaConfetti()" class="mt-5 px-6 py-3 rounded-2xl bg-gold text-night font-pixel hover:brightness-110 transition">🎊 Праздновать!</button>
+       </div>` : `
+       <div class="mt-8 space-y-2">
+         <div class="font-pixel text-center text-white mb-3">Найдено ключей: ${kc}/4 · Загадки:</div>
+         ${RIDDLES.map(r=>`<div class="flex gap-3 items-start bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm ${S.keys[r.k]?'opacity-50 line-through':''}"><span>${S.keys[r.k]?'✅':'🧩'}</span><span class="text-slate-300">${r.t}</span></div>`).join('')}
+       </div>`}
+   </div>`);
+  if(open) award('gateOpen','Вошёл в Скрытые Врата',10);
+};
+function megaConfetti(){ SFX.key(); confetti(200); }
+
+/* ============ 21. ИНИЦИАЛИЗАЦИЯ ============ */
+buildStars();
+buildClouds();
+initNav();
+updateSky();
+setInterval(updateSky, 60000);
+SFX.on = S.sound;
+updateHUD();
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
