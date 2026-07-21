@@ -927,10 +927,6 @@ ROUTES.photos = function renderPhotos(){
   app.innerHTML = pageShell(zone, `
    ${npcCard('🧸','Хранитель Памяти','Здесь живут настоящие моменты Мурада. Прикрепи новый полароид на доску!')}
    <div class="mt-6 bg-gradient-to-b from-rose-950/40 to-night rounded-3xl border border-white/10 p-4 md:p-8">
-     <div class="flex flex-wrap items-center justify-center gap-3 mb-6">
-       <button onclick="phOpenUpload()" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 font-pixel text-sm hover:brightness-110 active:scale-95 transition">📸 Добавить фото</button>
-       ${sb ? '' : '<span class="text-xs text-red-400">⚠️ Облако не настроено</span>'}
-     </div>
      <div id="phBoard" class="relative min-h-[16rem] flex flex-wrap gap-6 justify-center items-start">
        <div class="text-slate-400 text-sm py-10">Загружаем доску памяти…</div>
      </div>
@@ -960,62 +956,6 @@ async function phLoad(){
 function phZoom(i){
   const p = phCache[i]; if(!p) return; SFX.pop();
   openModal(p.caption || 'Фото Мурада', '📸', `<img src="${esc(p.url)}" alt="${esc(p.caption||'')}" class="w-full rounded-xl border border-white/10"/>`);
-}
-
-function phOpenUpload(){
-  if(!sb){ toast('⚠️ Облачное хранилище не настроено'); return; }
-  openModal('Новый полароид', '📸', `
-    <div class="space-y-3">
-      <input type="file" id="phFile" accept="image/*" class="w-full text-sm bg-white/10 rounded-xl px-3 py-2 border border-white/15"/>
-      <input type="text" id="phCaption" maxlength="60" placeholder="Подпись (например: Матч с Lakers дома)" class="w-full px-3 py-2.5 rounded-xl bg-white/10 border border-white/15 outline-none focus:border-neon text-sm text-white placeholder:text-slate-400"/>
-      <div id="phUploadMsg" class="text-xs text-slate-400 min-h-[1.2rem]"></div>
-      <button onclick="phUpload()" id="phUploadBtn" class="w-full px-5 py-2.5 rounded-xl bg-neon text-night font-bold hover:brightness-110 transition">⬆️ Загрузить</button>
-    </div>`);
-}
-
-// Сжимаем фото перед загрузкой, чтобы не расходовать зря место в облаке
-function phCompress(file, maxSide=1280, quality=0.82){
-  return new Promise((resolve, reject)=>{
-    const img = new Image();
-    const reader = new FileReader();
-    reader.onload = e => { img.onload = () => {
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
-      const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Не удалось обработать изображение')), 'image/jpeg', quality);
-    }; img.onerror = () => reject(new Error('Не удалось прочитать изображение')); img.src = e.target.result; };
-    reader.onerror = () => reject(new Error('Не удалось прочитать файл'));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function phUpload(){
-  const fileInput = $('#phFile'), captionInput = $('#phCaption'), msg = $('#phUploadMsg'), btn = $('#phUploadBtn');
-  const file = fileInput && fileInput.files[0];
-  if(!file){ msg.textContent = 'Выбери файл фото ✏️'; return; }
-  if(!file.type.startsWith('image/')){ msg.textContent = 'Нужен файл изображения (jpg, png...)'; return; }
-  btn.disabled = true; btn.textContent = 'Загружаем…'; msg.textContent = 'Сжимаем и отправляем в облако…';
-  try{
-    const blob = await phCompress(file);
-    const path = `murad-${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
-    const { error: upErr } = await sb.storage.from('photos').upload(path, blob, { contentType:'image/jpeg' });
-    if(upErr) throw upErr;
-    const { data: pub } = sb.storage.from('photos').getPublicUrl(path);
-    const caption = (captionInput.value||'').trim().slice(0,60);
-    const { error: insErr } = await sb.from('photos').insert({ url: pub.publicUrl, caption });
-    if(insErr) throw insErr;
-    SFX.success(); confetti(70);
-    award('firstPhoto','Прикрепил первый полароид',2);
-    closeModal();
-    toast('📸 Фото добавлено на доску!');
-    phLoad();
-  }catch(err){
-    console.warn('phUpload error', err);
-    SFX.error();
-    msg.textContent = '⚠️ Не получилось загрузить. Проверь интернет и попробуй снова.';
-    btn.disabled = false; btn.textContent = '⬆️ Загрузить';
-  }
 }
 
 /* ============ 19. SPACE PORT — СТРОЙКА МЕЧТЫ ============ */
