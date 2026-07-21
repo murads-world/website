@@ -917,7 +917,7 @@ const PH_ROT = [-6,-3,-1,2,4,7,-4,3,-2,5,-7,1,6,-5,2];
 
 async function phFetch(){
   if(!sb) return [];
-  const { data, error } = await sb.from('photos').select('*').order('created_at', { ascending:false });
+  const { data, error } = await sb.from('photos').select('*').order('sort_order', { ascending:true, nullsFirst:false });
   if(error){ console.warn('phFetch error', error); return []; }
   return data || [];
 }

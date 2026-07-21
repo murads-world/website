@@ -101,7 +101,10 @@ async function phUpload(){
     if(upErr) throw upErr;
     const { data: pub } = sb.storage.from('photos').getPublicUrl(path);
     const caption = (captionInput.value||'').trim().slice(0,60);
-    const { error: insErr } = await sb.from('photos').insert({ url: pub.publicUrl, caption });
+    // Новое фото получает порядок на 1 больше текущего максимума — попадает в конец списка
+    const { data: maxRow } = await sb.from('photos').select('sort_order').order('sort_order', { ascending:false }).limit(1).maybeSingle();
+    const nextOrder = (maxRow && maxRow.sort_order != null) ? maxRow.sort_order + 1 : 1;
+    const { error: insErr } = await sb.from('photos').insert({ url: pub.publicUrl, caption, sort_order: nextOrder });
     if(insErr) throw insErr;
     msg.textContent = '✅ Фото добавлено!';
     fileInput.value=''; captionInput.value='';
@@ -114,15 +117,21 @@ async function phUpload(){
   }
 }
 
-/* ============ Список текущих фото + удаление ============ */
+/* ============ Список текущих фото + удаление + порядок ============ */
+let phListCache = [];
 async function phRefreshList(){
   const list = $('#phList'), count = $('#phCount');
-  const { data, error } = await sb.from('photos').select('*').order('created_at', { ascending:false });
+  const { data, error } = await sb.from('photos').select('*').order('sort_order', { ascending:true, nullsFirst:false });
   if(error){ list.innerHTML = '<div class="text-xs text-red-400">Не удалось загрузить список</div>'; return; }
-  count.textContent = (data||[]).length;
-  if(!data || !data.length){ list.innerHTML = '<div class="text-xs text-slate-500">Пока пусто</div>'; return; }
-  list.innerHTML = data.map(p => `
+  phListCache = data || [];
+  count.textContent = phListCache.length;
+  if(!phListCache.length){ list.innerHTML = '<div class="text-xs text-slate-500">Пока пусто</div>'; return; }
+  list.innerHTML = phListCache.map((p,i) => `
     <div class="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+      <div class="flex flex-col gap-0.5">
+        <button onclick="phMove(${i},-1)" ${i===0?'disabled':''} class="text-xs px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed">⬆️</button>
+        <button onclick="phMove(${i},1)" ${i===phListCache.length-1?'disabled':''} class="text-xs px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 disabled:opacity-20 disabled:cursor-not-allowed">⬇️</button>
+      </div>
       <img src="${p.url}" class="w-10 h-10 object-cover rounded"/>
       <div class="flex-1 text-xs text-slate-300 truncate">${p.caption || '(без подписи)'}</div>
       <button onclick="phDelete('${p.id}')" class="text-xs text-red-400 hover:text-red-300 px-2">Удалить</button>
@@ -132,6 +141,17 @@ async function phDelete(id){
   if(!confirm('Удалить это фото с доски?')) return;
   const { error } = await sb.from('photos').delete().eq('id', id);
   if(error){ alert('Не удалось удалить: ' + error.message); return; }
+  phRefreshList();
+}
+// Меняем местами sort_order текущего фото и соседнего (выше/ниже на 1 позицию)
+async function phMove(i, dir){
+  const other = i + dir;
+  if(other < 0 || other >= phListCache.length) return;
+  const a = phListCache[i], b = phListCache[other];
+  const [aOrder, bOrder] = [a.sort_order, b.sort_order];
+  const { error: e1 } = await sb.from('photos').update({ sort_order: bOrder }).eq('id', a.id);
+  const { error: e2 } = await sb.from('photos').update({ sort_order: aOrder }).eq('id', b.id);
+  if(e1 || e2){ alert('Не удалось изменить порядок'); return; }
   phRefreshList();
 }
 </script>
