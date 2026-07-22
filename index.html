@@ -237,7 +237,7 @@ try{ sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
 /* ============ 2. СОСТОЯНИЕ (localStorage) ============ */
 const LS = 'muradworld_v1';
 const SCHEMA_VERSION = 2;
-function def(){ return { version:SCHEMA_VERSION, keys:{pixel:false,tree:false,sport:false,chess:false}, parts:0, ach:{}, interests:['LEGO','Minecraft','Шахматы','AI','Баскетбол'], sound:true, sky:'auto', legoDone:0, mc:null, legoGallery:[] }; }
+function def(){ return { version:SCHEMA_VERSION, keys:{pixel:false,tree:false,sport:false,chess:false}, parts:0, ach:{}, interests:['LEGO','Minecraft','Шахматы','AI','Баскетбол'], sound:true, sky:'auto', legoDone:0, mc:null, legoGallery:[], chessSolved:[] }; }
 let S = (()=>{
   try{
     const r=localStorage.getItem(LS);
@@ -508,6 +508,20 @@ function goldenFruit(){
 function hs(e,label,fn){
   return `<button onclick="${fn}" class="card-hover bg-gradient-to-b from-white/10 to-white/5 border border-white/10 rounded-2xl p-5 text-center"><div class="text-4xl">${e}</div><div class="text-sm mt-2 text-slate-300">${label}</div></button>`;
 }
+/* --- Банк шахматных задач: "мат в 1 ход" ферзём, разные позиции --- */
+const CHESS_PUZZLES = [
+  { black:'a8', white:'c6', start:'b5', mate:'b7',
+    hint:'Ферзь стоит на b5. Отправь её выше — прямо к королю!' },
+  { black:'h8', white:'g6', start:'b7', mate:'h7',
+    hint:'Ферзь стоит на b7. Пройди по горизонтали 7 прямо к королю в углу!' },
+  { black:'a1', white:'b3', start:'g2', mate:'a2',
+    hint:'Ферзь стоит на g2. Пройди по горизонтали 2 прямо к королю в углу!' },
+  { black:'h1', white:'g3', start:'b2', mate:'h2',
+    hint:'Ферзь стоит на b2. Пройди по горизонтали 2 прямо к королю в углу!' },
+];
+let chessCur = 0; // индекс текущей задачи из банка
+function chessPuzzle(){ return CHESS_PUZZLES[chessCur]; }
+
 ROUTES.home = function renderHome(){
   app.innerHTML = pageShell(ZONES[1], `
    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -522,7 +536,11 @@ ROUTES.home = function renderHome(){
      <div>
        ${npcCard('🦉','Сова Logic','Мат в 1 ход! Ход белых. Найди, куда должна пойти ферзь, чтобы чёрному королю некуда было деться.')}
        <div id="chessMsg" class="text-sm text-slate-400 mt-3">Нажимай на клетку, куда должна пойти белая ферзь ♛.</div>
-       ${S.keys.chess ? '<div class="mt-3 font-pixel text-neon">✓ Задача решена!</div>' : ''}
+       <div class="flex items-center gap-3 mt-3">
+         ${S.keys.chess ? '<div class="font-pixel text-neon">✓ Есть ключ за первую задачу!</div>' : ''}
+         <button id="chessNextBtn" onclick="chessNext()" class="text-xs px-3 py-1.5 rounded-lg bg-white/10 border border-white/15 hover:bg-white/20 transition ${S.ach.chessWin?'':'hidden'}">🔄 Новая задача</button>
+       </div>
+       <div class="text-xs text-slate-500 mt-2">Решено задач: <b id="chessSolvedCount">${(S.chessSolved||[]).length}</b>/${CHESS_PUZZLES.length}</div>
      </div>
      <div id="chessBoard" class="mx-auto"></div>
    </div>`);
@@ -533,10 +551,12 @@ function backpack(){ openModal('Что в рюкзаке?','🎒','<ul class="sp
 function trophies(){ openModal('Полка трофеев','🏆','<ul class="space-y-2"><li>🥇 Школьный шахматный турнир — 2 место</li><li>🏀 MVP классного финала</li><li>🧱 LEGO-мастер — семейный конкурс</li><li>📜 Диплом олимпиады по математике</li></ul>'); }
 function bed(){ SFX.pop(); toast('Мурад заряжается 💤 До завтра!'); }
 
-/* --- Шахматная задача: ♚a8, ♔c6, ♕b5 → ♕b7# --- */
 function buildChess(){
-  const solved=S.keys.chess;
-  const pieces = solved ? {'a8':'k','c6':'K','b7':'Q'} : {'a8':'k','c6':'K','b5':'Q'};
+  const puzzle = chessPuzzle();
+  const solvedThisOne = (S.chessSolved||[]).includes(chessCur);
+  const pieces = solvedThisOne
+    ? {[puzzle.black]:'k', [puzzle.white]:'K', [puzzle.mate]:'Q'}
+    : {[puzzle.black]:'k', [puzzle.white]:'K', [puzzle.start]:'Q'};
   const el=$('#chessBoard'); if(!el) return;
   let h='<div class="grid grid-cols-8 w-[280px] h-[280px] md:w-80 md:h-80 rounded-lg overflow-hidden border-4 border-slate-600 shadow-2xl">';
   for(let r=0;r<8;r++)for(let f=0;f<8;f++){
@@ -552,7 +572,7 @@ function buildChess(){
   el.querySelector('.grid').addEventListener('click', onChessClick);
 }
 function setChessMsg(t){ const m=$('#chessMsg'); if(m) m.textContent=t; }
-// Клетки, куда ферзь легально ходит с b5 (вертикаль b, горизонталь 5, диагонали) —
+// Клетки, куда ферзь легально ходит с текущей стартовой позиции —
 // нужны, чтобы отличать "легальный, но не мат" ход от случайного клика мимо.
 function queenReaches(from, to){
   const [ff,fr]=[from.charCodeAt(0), +from[1]], [tf,tr]=[to.charCodeAt(0), +to[1]];
@@ -563,18 +583,24 @@ function queenReaches(from, to){
 function onChessClick(e){
   const b=e.target.closest('[data-sq]'); if(!b) return;
   const sq=b.dataset.sq;
-  if(S.keys.chess) return;
-  if(sq==='b7'){
+  const puzzle = chessPuzzle();
+  const solvedThisOne = (S.chessSolved||[]).includes(chessCur);
+  if(solvedThisOne) return;
+  if(sq===puzzle.mate){
     SFX.success(); confetti(80);
-    setChessMsg('♛ b7 — шах и мат! Королю некуда бежать. Блестяще! 🎉');
-    awardKey('chess','Шах и мат');
-    award('chessWin','Решил задачу совы Logic',3);
+    setChessMsg(`♛ ${sq} — шах и мат! Королю некуда бежать. Блестяще! 🎉`);
+    if(!S.chessSolved) S.chessSolved=[];
+    S.chessSolved.push(chessCur); save();
+    if(chessCur===0) awardKey('chess','Шах и мат');
+    award('chessWin_'+chessCur,'Решил задачу совы Logic #'+(chessCur+1), chessCur===0?3:1);
+    const cnt=$('#chessSolvedCount'); if(cnt) cnt.textContent=S.chessSolved.length;
+    const nb=$('#chessNextBtn'); if(nb) nb.classList.remove('hidden');
     buildChess();
-  } else if(sq==='b5'){
-    SFX.pop(); setChessMsg('Ферзь стоит на b5. Отправь её выше — прямо к королю!');
-  } else if(sq==='c6'){
-    SFX.pop(); setChessMsg('Король на c6 поддерживает ферзя — его трогать не нужно.');
-  } else if(queenReaches('b5', sq)){
+  } else if(sq===puzzle.start){
+    SFX.pop(); setChessMsg(puzzle.hint);
+  } else if(sq===puzzle.white){
+    SFX.pop(); setChessMsg('Король поддерживает ферзя — его трогать не нужно.');
+  } else if(queenReaches(puzzle.start, sq)){
     // Ход геометрически возможен для ферзя, но не даёт мат — объясняем, почему конкретно
     SFX.pop();
     b.classList.add('animate-shake'); setTimeout(()=>b.classList.remove('animate-shake'),450);
@@ -582,8 +608,17 @@ function onChessClick(e){
   } else {
     SFX.error();
     b.classList.add('animate-shake'); setTimeout(()=>b.classList.remove('animate-shake'),450);
-    setChessMsg(pick(['Ферзь так ходить не может — только по прямой или диагонали.','Подсказка: решающий ход — по линии "b".','Король заперт в углу — нанеси финальный удар ферзём!']));
+    setChessMsg(pick(['Ферзь так ходить не может — только по прямой или диагонали.','Подсказка: следи за линией, на которой стоит ферзь.','Король заперт в углу — нанеси финальный удар ферзём!']));
   }
+}
+// Переключиться на следующую нерешённую задачу (или случайную, если все решены — для повторной игры)
+function chessNext(){
+  SFX.click();
+  const unsolved = CHESS_PUZZLES.map((_,i)=>i).filter(i => !(S.chessSolved||[]).includes(i) && i!==chessCur);
+  if(unsolved.length){ chessCur = pick(unsolved); }
+  else { chessCur = (chessCur+1) % CHESS_PUZZLES.length; }
+  setChessMsg('Новая задача! Нажимай на клетку, куда должна пойти белая ферзь ♛.');
+  buildChess();
 }
 
 /* ============ 13. LEGO WORKSHOP — ЧЕРТЁЖ ============ */
@@ -784,9 +819,10 @@ function aiGen(){
 function aiThink(){ const t=$('#aiThought'); if(t){ typewriter(t,pick(THOUGHTS)); SFX.pop(); } }
 
 /* ============ 16. SPORTS PARK — БАСКЕТБОЛ LAKERS ============ */
-let spTimer=null, spHoopX=50, spDir=1, spFlying=false, spScore=0, spStreak=0;
+let spTimer=null, spHoopX=50, spDir=1, spFlying=false, spScore=0, spStreak=0, spSpeed=0.9;
+const SP_MIN_SPEED=0.6, SP_MAX_SPEED=1.8, SP_SPEED_STEP=0.12;
 ROUTES.sports = function renderSports(){
-  spScore=0; spStreak=0; spFlying=false; spHoopX=50; spDir=1;
+  spScore=0; spStreak=0; spFlying=false; spHoopX=50; spDir=1; spSpeed=SP_MIN_SPEED;
   app.innerHTML = pageShell(ZONES[5], `
    <div class="bg-gradient-to-b from-grape/30 to-night rounded-3xl border border-white/10 p-4 md:p-6">
      <div class="flex justify-between items-center mb-3 font-pixel flex-wrap gap-2">
@@ -809,7 +845,7 @@ ROUTES.sports = function renderSports(){
    </div>`);
   clearInterval(spTimer);
   spTimer=setInterval(()=>{
-    spHoopX+=spDir*0.9;
+    spHoopX+=spDir*spSpeed;
     if(spHoopX>86) spDir=-1; if(spHoopX<14) spDir=1;
     const h=$('#hoop'); if(h) h.style.left=spHoopX+'%';
   },30);
@@ -831,11 +867,15 @@ function spThrow(){
       SFX.success(); spScore++; spStreak++; S.parts++; save(); updateHUD();
       miniConfetti(land);
       ball.animate([{bottom:'64%'},{bottom:'10%'}],{duration:300});
+      // Каждое попадание чуть ускоряет кольцо — награда за мастерство, а не скучное постоянство
+      spSpeed = Math.min(SP_MAX_SPEED, spSpeed + SP_SPEED_STEP);
       if(spStreak===3) awardKey('sport','Хет-трик');
       else if(spStreak>3) toast('🔥 Серия x'+spStreak+'!');
     } else {
       SFX.error(); spStreak=0;
       ball.animate([{left:land+'%', bottom:'64%'},{left:(land+14)+'%', bottom:'6%'}],{duration:500, easing:'ease-in'});
+      // После промаха слегка снижаем скорость — не наказываем вдвойне за неудачу
+      spSpeed = Math.max(SP_MIN_SPEED, spSpeed - SP_SPEED_STEP*1.5);
     }
     const sc=$('#spScore'), st=$('#spStreak');
     if(sc) sc.textContent=spScore; if(st) st.textContent=spStreak;
