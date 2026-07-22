@@ -840,7 +840,7 @@ ROUTES.sports = function renderSports(){
      </div>
      <div class="text-center mt-4">
        <button onclick="spThrow()" class="px-8 py-3 rounded-2xl bg-gradient-to-r from-gold to-orange-500 text-night font-pixel text-lg hover:brightness-110 active:scale-95 transition">Бросить! 🏀</button>
-       <p class="text-xs text-slate-400 mt-2">Жми, когда кольцо прямо над мячом. 3 подряд = секрет! 💜💛</p>
+       <p class="text-xs text-slate-400 mt-2">Жми «Бросить», когда кольцо проезжает над центром площадки. 3 попадания всего = секрет! 💜💛</p>
      </div>
    </div>`);
   clearInterval(spTimer);
@@ -855,25 +855,34 @@ function spThrow(){
   if(spFlying) return;
   const ball=$('#ball'); if(!ball) return;
   spFlying=true; SFX.pop();
-  const land=spHoopX;
+  const hoopAtClick=spHoopX; // где было кольцо в момент нажатия — от этого зависит попадание
+  // Мяч всегда летит по одной и той же дуге вверх (к центру, где висит кольцо в состоянии покоя).
+  // Успех броска зависит не от того, куда летит мяч, а от того, было ли кольцо рядом с центром
+  // именно в момент клика — так и задумана игра «поймай момент».
   const anim=ball.animate([
     {left:'50%', bottom:'6%'},
-    {left:((50+land)/2)+'%', bottom:'80%', offset:.55},
-    {left:land+'%', bottom:'64%'}
+    {left:'50%', bottom:'80%', offset:.55},
+    {left:'50%', bottom:'64%'}
   ],{duration:650, easing:'ease-out'});
   anim.onfinish=()=>{
-    const made = Math.abs(spHoopX-land) < 6.5;
+    // Попадание засчитывается, если кольцо было близко к центру площадки (50%) именно
+    // В МОМЕНТ КЛИКА (hoopAtClick) — где мяч и подбрасывается вверх.
+    // Раньше здесь ошибочно сравнивалось с положением кольца ПОСЛЕ окончания анимации
+    // (то есть уже уехавшим) — из-за этого попасть было почти невозможно.
+    const made = Math.abs(hoopAtClick - 50) < 9;
     if(made){
       SFX.success(); spScore++; spStreak++; S.parts++; save(); updateHUD();
-      miniConfetti(land);
+      miniConfetti(50);
       ball.animate([{bottom:'64%'},{bottom:'10%'}],{duration:300});
       // Каждое попадание чуть ускоряет кольцо — награда за мастерство, а не скучное постоянство
       spSpeed = Math.min(SP_MAX_SPEED, spSpeed + SP_SPEED_STEP);
-      if(spStreak===3) awardKey('sport','Хет-трик');
-      else if(spStreak>3) toast('🔥 Серия x'+spStreak+'!');
+      // Ключ теперь за 3 попадания ВСЕГО (не обязательно подряд) — честнее для 9-летнего игрока
+      if(spScore>=3) awardKey('sport','Три точных броска');
+      if(spStreak>1) toast('🔥 Серия x'+spStreak+'!');
     } else {
       SFX.error(); spStreak=0;
-      ball.animate([{left:land+'%', bottom:'64%'},{left:(land+14)+'%', bottom:'6%'}],{duration:500, easing:'ease-in'});
+      // Мяч ударяется об кольцо (там, где оно было в момент промаха) и отскакивает вниз
+      ball.animate([{left:'50%', bottom:'64%'},{left:(hoopAtClick>50?'40%':'60%'), bottom:'6%'}],{duration:500, easing:'ease-in'});
       // После промаха слегка снижаем скорость — не наказываем вдвойне за неудачу
       spSpeed = Math.max(SP_MIN_SPEED, spSpeed - SP_SPEED_STEP*1.5);
     }
